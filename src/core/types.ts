@@ -39,6 +39,35 @@ export interface TemplateConfig {
     invertMedia?: boolean;
     thresholdMedia?: boolean;
   };
+  /** 静止画 MAD 分镜列表，按歌词行/文本段索引对齐（可稀疏，null 槽位表示沿用上一镜）。 */
+  shots?: (Shot | null)[];
+}
+
+/** 分镜取景框，归一化到原图尺寸（0..1）。 */
+export interface ShotRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export type ShotTransition = 'cut' | 'fade' | 'slide' | 'zoom';
+
+export type ShotMotion =
+  | 'none'
+  | 'zoomIn'
+  | 'zoomOut'
+  | 'panLeft'
+  | 'panRight'
+  | 'panUp'
+  | 'panDown';
+
+/** 单句歌词对应的静止画分镜：取景框 + 入/出转场 + 过程运动。 */
+export interface Shot {
+  rect: ShotRect;
+  in?: ShotTransition;
+  out?: ShotTransition;
+  motion?: ShotMotion;
 }
 
 export interface MotionTargetInfo {

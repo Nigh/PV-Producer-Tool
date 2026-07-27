@@ -11,6 +11,27 @@ export const ja: Record<LocaleKey, string> = {
   'nav_settings': '設定 Settings',
   'theme_light': 'ライトテーマ Light',
 
+  // 静止画カット割り
+  'nav_shots': 'カット割り Shots',
+  'shots_need_image': '先に「再生と素材」で静止画を読み込んでください',
+  'shot_hint': '画像上をドラッグして切り取り範囲を指定。枠内ドラッグで移動、右下で拡縮',
+  'shot_in': 'イン In',
+  'shot_out': 'アウト Out',
+  'shot_motion': 'モーション Motion',
+  'shot_clear': '削除',
+  'shot_preview': 'プレビュー',
+  'tr_cut': 'カット Cut',
+  'tr_fade': 'フェード Fade',
+  'tr_slide': 'スライド Slide',
+  'tr_zoom': 'ズーム Zoom',
+  'mo_none': '静止',
+  'mo_zoomIn': 'ズームイン',
+  'mo_zoomOut': 'ズームアウト',
+  'mo_panLeft': '左パン',
+  'mo_panRight': '右パン',
+  'mo_panUp': '上パン',
+  'mo_panDown': '下パン',
+
   // Left panel
   'template': 'テンプレート Template',
   'custom': '✦ カスタム Custom',

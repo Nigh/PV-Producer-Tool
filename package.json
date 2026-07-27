@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "check": "svelte-check --tsconfig ./tsconfig.json",
+    "check:shots": "node --experimental-strip-types tests/shotMath.check.ts",
     "build": "svelte-check --tsconfig ./tsconfig.json && vite build",
     "preview": "vite preview"
   },

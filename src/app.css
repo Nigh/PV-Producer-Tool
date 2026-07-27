@@ -323,6 +323,121 @@ textarea.textarea {
   color: var(--color-base-content);
 }
 
+/* ─── Still-image shot editor ─── */
+
+.shots-empty {
+  font-size: 0.72rem;
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  line-height: 1.5;
+}
+
+.shot-frame {
+  position: relative;
+  width: 100%;
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+  line-height: 0;
+}
+
+.shot-thumb {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  border: 1px solid color-mix(in oklab, var(--color-base-content) 15%, transparent);
+}
+
+.shot-rect {
+  position: absolute;
+  border: 2px solid var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+  cursor: move;
+}
+
+.shot-rect-handle {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: nwse-resize;
+}
+
+.shot-opt-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.shot-opt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.65rem;
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+}
+
+.shot-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.shot-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  text-align: left;
+  color: color-mix(in oklab, var(--color-base-content) 75%, transparent);
+  cursor: pointer;
+}
+
+.shot-line:hover {
+  background: color-mix(in oklab, var(--color-base-content) 8%, transparent);
+}
+
+.shot-line-active {
+  background: color-mix(in oklab, var(--color-primary) 20%, transparent);
+  color: var(--color-base-content);
+}
+
+.shot-line-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in oklab, var(--color-base-content) 35%, transparent);
+}
+
+.shot-line-dot-set {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.shot-line-idx {
+  font-size: 0.62rem;
+  opacity: 0.5;
+  min-width: 16px;
+  flex-shrink: 0;
+}
+
+.shot-line-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ─── Canvas color swatches ─── */
 
 .color-swatches {

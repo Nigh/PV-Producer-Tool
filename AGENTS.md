@@ -10,7 +10,7 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 - **UI**: Svelte 5 (runes) + Tailwind CSS v4 + daisyUI v5, themed by `@xianii/design-system` (imported in `src/app.css`).
 - **Build**: Vite 7 (`@sveltejs/vite-plugin-svelte` v6, `@tailwindcss/vite`) + TypeScript 5.9 (`strict`, `verbatimModuleSyntax`, `noEmit`). Type checking via `svelte-check` (covers .ts and .svelte).
 - **Commands**: `npm run dev` (Vite dev + HMR), `npm run check` (svelte-check), `npm run build` (`svelte-check && vite build`), `npm run preview`.
-- No test framework. `npm run build` is the only CI-grade check.
+- No test framework. `npm run build` is the CI-grade check; `npm run check:shots` runs the assert-based shot-math self-check (node, no framework); `tests/shotCamera.smoke.html` is a browser integration smoke for the shot camera (open via dev server).
 - Vite `base` is `/pv-tool/` (override with `VITE_BASE` env var). Deployed to GitHub Pages via `.github/workflows/deploy.yml` on push to `main`. Working branch is `dev`.
 
 ## 3) Repo Layout
@@ -19,7 +19,7 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 - `src/ui/` — Svelte UI layer:
   - `store.svelte.ts` — runes state (`ui`), the `PVEngine` instance, and all template-management actions (select/save/delete/share-code/AI-generate/URL-param init). The single source of truth for UI↔engine sync.
   - `App.svelte` — left-sidebar navigation shell (nav rail + active section), engine mount, H-key hide-all, AI loader overlay, footer. Mobile: sidebar becomes an overlay drawer.
-  - `sections/` — one component per nav section: Template, Playback (text/media/audio/timeline), PostFx, Effects (grid; toggling while a preset is active auto-switches to Custom), Ai, Export, Settings (canvas color/font/FPS/theme/NP-listen).
+  - `sections/` — one component per nav section: Template, Playback (text/media/audio/timeline), Shots (still-image MAD shot editor: drag-to-frame on a thumbnail, per-line in/out transitions + Ken Burns motion), PostFx, Effects (grid; toggling while a preset is active auto-switches to Custom), Ai, Export, Settings (canvas color/font/FPS/theme/NP-listen).
   - `theme.svelte.ts` — xianii / xianii-light theme switch persisted in localStorage.
   - `recorder.svelte.ts` — MediaRecorder + PNG-sequence (alpha) export. `copyUrl.ts` — copy-URL modal.
   - `Slider.svelte` — labeled range control.
@@ -29,7 +29,9 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
   - `types.ts` — `TemplateConfig`, `ColorPalette`, `UpdateContext`, `resolveColor()`.
   - `effectCatalog.ts` — UI-facing catalog of all effects (labels, default configs, categories).
   - `aiService.ts` — AI template generation via OpenAI-compatible `/v1/chat/completions`; user supplies base URL + API key at runtime (never hardcode keys). `EFFECT_SKILLS` maps effect ids to Chinese semantic descriptions for the LLM.
-  - `templateStore.ts` — custom templates in `localStorage` + share-code encode/decode.
+  - `templateStore.ts` — custom templates in `localStorage` + share-code encode/decode (JSON+deflate — new optional `TemplateConfig` fields like `shots` pass through automatically, backward compatible).
+  - `shotMath.ts` — pure, time-parametric shot-view math (cover framing, Ken Burns motion, in/out transitions); seek-safe by construction, covered by `tests/shotMath.check.ts`.
+  - `shotCamera.ts` — `ShotCamera`: crops per-shot textures from the full-resolution source image (lazy + cached, margin-expanded), dual-sprite crossfade between shots. Engine keeps `sourceImage` at full resolution; the base media texture is downscaled to the queried GPU max texture size (capped 8192).
   - `beatProvider.ts`, `motionDetector.ts`, `nowPlayingProvider.ts`, `colorExtractor.ts`, `lrc.ts`, `srtParser.ts`, `ccl.ts` (connected-component labeling for glyph shattering).
 - `src/effects/` — one file per effect (~100 files). All extend `BaseEffect` (`base.ts`): `init() → setup()`, `update(ctx)`, `destroy()`; set `heavy = true` for GPU/CPU-costly effects so the engine can frame-skip. Effects are registered by string id in `src/effects/index.ts` (`register()` / `createEffect()`).
 - `src/templates/` — preset `TemplateConfig`s (effect id + config lists), aggregated in `src/templates/index.ts`.

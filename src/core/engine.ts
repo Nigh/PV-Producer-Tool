@@ -2,7 +2,8 @@
 // Licensed under Non-Commercial License. See LICENSE for terms.
 
 import * as PIXI from 'pixi.js';
-import type { TemplateConfig, UpdateContext, ColorPalette, LayerType, MotionTargetInfo, LyricLine } from './types';
+import type { TemplateConfig, UpdateContext, ColorPalette, LayerType, MotionTargetInfo, LyricLine, Shot } from './types';
+import { ShotCamera } from './shotCamera';
 import { createEffect, BaseEffect } from '../effects';
 import { extractDominantColors } from './colorExtractor';
 import { MediaOutlineRenderer } from './mediaOutline';
@@ -52,6 +53,10 @@ export class PVEngine {
   private _glitch = 0;
 
   private mediaElement: HTMLVideoElement | HTMLImageElement | null = null;
+  /** 原始全分辨率图片（不降采样），分镜相机从这里现切纹理。 */
+  private originalImage: HTMLImageElement | null = null;
+  private shotCamera: ShotCamera | null = null;
+  private _shots: (Shot | null)[] = [];
   private outlineRenderer: MediaOutlineRenderer | null = null;
   private _outlineEnabled = false;
   private extractingColors = false;
@@ -271,6 +276,10 @@ export class PVEngine {
         this.hueShift = template.postfx.hueShift ?? 0;
       }
 
+      if (template.shots) {
+        this.setShots(template.shots);
+      }
+
       this.syncOutline();
       this.syncResolution();
     } finally {
@@ -301,6 +310,112 @@ export class PVEngine {
 
   set segmentDuration(val: number) { this._segmentDuration = val; }
   get segmentDuration() { return this._segmentDuration; }
+
+  /**
+   * GPU 实际允许的最大纹理边长。WebGL 从 context 查询，WebGPU 读 device
+   * limits，均不可用时退回 4096。
+   * ponytail: 上限夹到 8192 —— 16384² RGBA 单纹理就要 1GB 显存；
+   * 需要更高精度时靠分镜相机按取景框现切，而不是抬高整图纹理。
+   */
+  get maxTextureSize(): number {
+    const r = this.app.renderer as any;
+    const gl: WebGLRenderingContext | undefined = r?.gl;
+    const size = gl?.getParameter?.(gl.MAX_TEXTURE_SIZE)
+      ?? r?.device?.limits?.maxTextureDimension2D
+      ?? 4096;
+    return Math.min(size, 8192);
+  }
+
+  /** 设置静止画分镜列表（按歌词行/文本段索引对齐，可稀疏）。 */
+  setShots(shots: (Shot | null)[]): void {
+    this._shots = shots;
+    this.syncShotCamera();
+  }
+
+  get shots(): (Shot | null)[] {
+    return this._shots;
+  }
+
+  /** 是否具备分镜播放条件（已载入静态图且至少一个分镜）。 */
+  get shotsActive(): boolean {
+    return !!this.shotCamera?.enabled;
+  }
+
+  /** 分镜相机取景用的原始全分辨率图片（仅静态图媒体时非空）。 */
+  get sourceImage(): HTMLImageElement | null {
+    return this.originalImage;
+  }
+
+  /** 分镜编辑器用：当前时间轴的全部行文本（歌词 / SRT / 纯文本段）。 */
+  get segmentTexts(): string[] {
+    if (this._srtTimeline) return this._srtTimeline.map(e => e.text);
+    if (this.lyricTimeline && this.lyricTimeline.length > 0) {
+      return this.lyricTimeline.map(l => l.text);
+    }
+    return this.textSegments;
+  }
+
+  /** 分镜编辑器用：指定行的起始播放时间（秒），供预览跳转。 */
+  segmentStartTime(index: number): number {
+    if (this._srtTimeline) return (this._srtTimeline[index]?.startMs ?? 0) / 1000;
+    if (this.lyricTimeline && this.lyricTimeline.length > 0) {
+      return (this.lyricTimeline[index]?.time ?? 0) - this.lyricOffsetSeconds;
+    }
+    return index * this._segmentDuration;
+  }
+
+  private syncShotCamera(): void {
+    const hasShots = this._shots.some((s) => !!s);
+    if (!this.originalImage || !hasShots) {
+      this.shotCamera?.setShots(this._shots);
+      if (this.shotCamera) this.shotCamera.container.visible = false;
+      this.setBaseMediaVisible(true);
+      return;
+    }
+    if (!this.shotCamera) {
+      this.shotCamera = new ShotCamera();
+    }
+    this.shotCamera.setMaxTextureSize(this.maxTextureSize);
+    this.shotCamera.attach(this.layers.get('media')!);
+    this.shotCamera.setImage(this.originalImage);
+    this.shotCamera.setShots(this._shots);
+    this.setBaseMediaVisible(false);
+  }
+
+  /** 分镜启用时隐藏整图基底 sprite（media 层 children[0]）。 */
+  private setBaseMediaVisible(visible: boolean): void {
+    const base = this.layers.get('media')?.children[0];
+    if (base && base !== this.shotCamera?.container) {
+      base.visible = visible;
+    }
+  }
+
+  /**
+   * 当前文本段索引与段时长（秒）。歌词时间轴用行间隔，SRT 用条目区间，
+   * 纯文本按 segmentDuration 均分循环。首行歌词之前 index 为 -1。
+   */
+  private currentSegmentInfo(time: number): { index: number; duration: number } {
+    if (this._srtTimeline) {
+      const ms = time * 1000;
+      const idx = this._srtTimeline.findIndex(e => ms >= e.startMs && ms < e.endMs);
+      if (idx < 0) return { index: -1, duration: this._segmentDuration };
+      const e = this._srtTimeline[idx];
+      return { index: idx, duration: Math.max(0.1, (e.endMs - e.startMs) / 1000) };
+    }
+    if (this.lyricTimeline && this.lyricTimeline.length > 0) {
+      const t = Math.max(0, time + this.lyricOffsetSeconds);
+      if (t < this.lyricTimeline[0].time) return { index: -1, duration: this._segmentDuration };
+      const idx = this.lyricCursor;
+      const next = this.lyricTimeline[idx + 1];
+      const duration = next
+        ? Math.max(0.1, next.time - this.lyricTimeline[idx].time)
+        : this._segmentDuration;
+      return { index: idx, duration };
+    }
+    const n = this.textSegments.length;
+    const index = n > 1 ? Math.floor(time / this._segmentDuration) % n : 0;
+    return { index, duration: this._segmentDuration };
+  }
 
   setSrtTimeline(entries: { startMs: number; endMs: number; text: string }[] | null) {
     this._srtTimeline = entries;
@@ -642,7 +757,11 @@ export class PVEngine {
     try {
       const mediaLayer = this.layers.get('media')!;
       this.destroyOutline();
+      // 先摘除分镜相机容器，避免被下面的 removeChildren+destroy 连带销毁
+      this.shotCamera?.detach();
       mediaLayer.removeChildren().forEach(c => c.destroy({ children: true }));
+      this.originalImage = null;
+      this.shotCamera?.setImage(null);
 
       const isVideo = file.type.startsWith('video/');
 
@@ -686,8 +805,10 @@ export class PVEngine {
           img.onerror = () => reject(new Error('Image load failed'));
         });
 
-        // Downscale if image exceeds WebGL max texture size (typically 4096 or 8192)
-        const maxDim = 4096;
+        this.originalImage = img;
+
+        // Downscale if image exceeds the GPU's actual max texture size
+        const maxDim = this.maxTextureSize;
         if (img.naturalWidth > maxDim || img.naturalHeight > maxDim) {
           const downscale = maxDim / Math.max(img.naturalWidth, img.naturalHeight);
           const canvas = document.createElement('canvas');
@@ -724,6 +845,8 @@ export class PVEngine {
         sprite.x = this.app.screen.width / 2;
         sprite.y = this.app.screen.height / 2;
         mediaLayer.addChild(sprite);
+
+        this.syncShotCamera();
       }
 
       if (this.currentTemplate?.features?.autoExtractColors) {
@@ -958,6 +1081,14 @@ export class PVEngine {
       beatIntensity: this.beat.getIntensity(time) * this._beatReactivity,
       motionTargets: this.motionTargets,
     };
+
+    if (this.shotCamera?.enabled) {
+      const seg = this.currentSegmentInfo(lyricClock);
+      this.shotCamera.update(
+        seg.index, ctx.segmentTime, seg.duration,
+        ctx.screenWidth, ctx.screenHeight,
+      );
+    }
 
     this.updateBgFill();
     this.applyCameraFX(time);

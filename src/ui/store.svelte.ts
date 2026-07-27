@@ -12,7 +12,7 @@ import { PVEngine } from '../core/engine';
 import { parseLrc } from '../core/lrc';
 import { templates } from '../templates';
 import { effectCatalog } from '../core/effectCatalog';
-import type { TemplateConfig } from '../core/types';
+import type { TemplateConfig, Shot } from '../core/types';
 import { t } from '../i18n';
 import {
   loadCustomTemplates,
@@ -76,6 +76,9 @@ export const ui = $state({
   timelineDuration: 0,
   paused: false,
 
+  // 静止画分镜（按歌词行/文本段索引对齐，可稀疏）
+  shots: [] as (Shot | null)[],
+
   // 杂项
   canvasColor: '',
   fontFamilies: [] as string[],
@@ -113,7 +116,19 @@ export function buildRuntimeTemplateSnapshot(base: TemplateConfig, name = base.n
     glitch: engine.glitch,
     hueShift: engine.hueShift,
   };
+  // 分镜属于运行态：保存/分享时带上当前编辑的分镜
+  if (engine.shots.some((s) => !!s)) {
+    snapshot.shots = cloneJson(engine.shots);
+  } else {
+    delete snapshot.shots;
+  }
   return snapshot;
+}
+
+/** 更新分镜列表（编辑器 → 引擎）。 */
+export function setShots(shots: (Shot | null)[]): void {
+  ui.shots = shots;
+  engine.setShots(cloneJson($state.snapshot(shots)) as (Shot | null)[]);
 }
 
 /**
@@ -188,6 +203,7 @@ export function syncFromEngine(): void {
   ui.tilt = engine.tilt;
   ui.glitch = engine.glitch;
   ui.hue = engine.hueShift;
+  ui.shots = engine.shots;
 }
 
 /** 模板配置 → Custom 勾选状态。 */

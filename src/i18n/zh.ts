@@ -9,6 +9,27 @@ export const zh = {
   'nav_settings': '设置 Settings',
   'theme_light': '浅色主题 Light',
 
+  // 静止画分镜
+  'nav_shots': '分镜 Shots',
+  'shots_need_image': '请先在「播放与素材」导入一张静态图片',
+  'shot_hint': '在图上拖拽框选取景；拖动框内移动，拖动右下角调整大小',
+  'shot_in': '入场 In',
+  'shot_out': '出场 Out',
+  'shot_motion': '运动 Motion',
+  'shot_clear': '清除',
+  'shot_preview': '预览',
+  'tr_cut': '硬切 Cut',
+  'tr_fade': '淡入淡出 Fade',
+  'tr_slide': '滑动 Slide',
+  'tr_zoom': '急推 Zoom',
+  'mo_none': '静止',
+  'mo_zoomIn': '推近 Zoom In',
+  'mo_zoomOut': '拉远 Zoom Out',
+  'mo_panLeft': '左摇 Pan L',
+  'mo_panRight': '右摇 Pan R',
+  'mo_panUp': '上摇 Pan U',
+  'mo_panDown': '下摇 Pan D',
+
   // Left panel
   'template': '模板 Template',
   'custom': '✦ Custom 自定义',

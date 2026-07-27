@@ -5,6 +5,9 @@ export const zh = {
   // Panel titles
   'postfx': '後期 Post FX',
   'effects_library': '效果库 Effects',
+  'nav_playback': '播放与素材 Media',
+  'nav_settings': '设置 Settings',
+  'theme_light': '浅色主题 Light',
 
   // Left panel
   'template': '模板 Template',

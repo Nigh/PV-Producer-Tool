@@ -72,6 +72,7 @@ export class PVEngine {
   private _resizeParent: HTMLElement | null = null;
   private _loading = false;
   private _bgColorOverride: string | null = null;
+  private _fontFamilyOverride: string | null = null;
   private _tick = 0;
   private _playbackTime = 0;
   private _paused = false;
@@ -226,6 +227,13 @@ export class PVEngine {
         const config = { ...entry.config };
         if (this.userText) {
           config._userText = this.textSegments[0] || this.userText;
+        }
+        if (this._fontFamilyOverride) {
+          // Prepend so the user's font wins but the effect's own stack
+          // stays as fallback for glyphs the local font doesn't cover.
+          config.fontFamily = config.fontFamily
+            ? `${this._fontFamilyOverride}, ${config.fontFamily}`
+            : `${this._fontFamilyOverride}, "Noto Serif JP", "Yu Mincho", serif`;
         }
 
         try {
@@ -570,6 +578,16 @@ export class PVEngine {
 
   set beatReactivity(val: number) { this._beatReactivity = val; }
   get beatReactivity() { return this._beatReactivity; }
+
+  /** Global font override (CSS family string); null = follow template. */
+  set fontFamily(font: string | null) {
+    if (font === this._fontFamilyOverride) return;
+    this._fontFamilyOverride = font;
+    // Effects bake fontFamily into their text objects at setup, so the
+    // only way to apply the override is to rebuild the current template.
+    if (this.currentTemplate) this.loadTemplate(this.currentTemplate);
+  }
+  get fontFamily() { return this._fontFamilyOverride; }
 
   set canvasColor(color: string | null) {
     this._bgColorOverride = color;

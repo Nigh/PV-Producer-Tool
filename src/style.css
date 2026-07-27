@@ -237,6 +237,21 @@ select option {
   color: #fff;
 }
 
+.font-pick-row {
+  display: flex;
+  gap: 8px;
+}
+
+.font-pick-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.font-pick-row .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .file-pick {
   display: flex;
   align-items: center;

@@ -1,16 +1,57 @@
 export const zh = {
   // Page
-  'page_title': 'PV Tool - 日式PV Visual生成',
+  'page_title': 'PV Producer Tool - 日式PV Visual生成',
+  'brand_title': 'PV Producer Tool',
 
-  // Panel titles
-  'postfx': '後期 Post FX',
-  'effects_library': '效果库 Effects',
+  // Nav titles (主标题) + English subtitle
+  'nav_template': '模板',
+  'nav_template_sub': 'Template',
+  'nav_playback': '播放与素材',
+  'nav_playback_sub': 'Media',
+  'nav_shots': '分镜',
+  'nav_shots_sub': 'Shots',
+  'nav_postfx': '後期',
+  'nav_postfx_sub': 'Post FX',
+  'nav_effects': '效果库',
+  'nav_effects_sub': 'Effects',
+  'nav_ai': 'AI 灵感生成',
+  'nav_ai_sub': 'AI Gen',
+  'nav_export': '导出',
+  'nav_export_sub': 'Export',
+  'nav_settings': '设置',
+  'nav_settings_sub': 'Settings',
+
+  // Panel titles (legacy keys kept for any leftover references)
+  'postfx': '後期',
+  'effects_library': '效果库',
+  'theme_light': '浅色主题',
+  'shots_need_image': '请先在「播放与素材」导入一张静态图片',
+  'shot_hint': '在图上拖拽框选取景；拖动框内移动，拖动右下角调整大小',
+  'shot_in': '入场 In',
+  'shot_out': '出场 Out',
+  'shot_motion': '运动 Motion',
+  'shot_clear': '清除',
+  'shot_preview': '预览',
+  'tr_cut': '硬切 Cut',
+  'tr_fade': '淡入淡出 Fade',
+  'tr_slide': '滑动 Slide',
+  'tr_zoom': '急推 Zoom',
+  'mo_none': '静止',
+  'mo_zoomIn': '推近 Zoom In',
+  'mo_zoomOut': '拉远 Zoom Out',
+  'mo_panLeft': '左摇 Pan L',
+  'mo_panRight': '右摇 Pan R',
+  'mo_panUp': '上摇 Pan U',
+  'mo_panDown': '下摇 Pan D',
 
   // Left panel
-  'template': '模板 Template',
+  'template': '模板',
   'custom': '✦ Custom 自定义',
   'canvas_color': '画布色 Canvas',
   'follow_template': '跟随模板',
+  'font_label': '字体 Font',
+  'load_local_fonts': '获取本机字体',
+  'load_fonts_failed': '获取本机字体失败（可能未授权）',
   'text_label': '文字 Text（用 / 分段）',
   'expand': '展开',
   'collapse': '收起',
@@ -28,8 +69,12 @@ export const zh = {
   'play': '▶ 播放',
   'playing': '♪ Playing',
   'paused': '⏹ Paused',
+  'lyric_prev': '上一句',
+  'lyric_next': '下一句',
   'bpm': 'BPM',
   'beat_react': '节拍反应 Beat React',
+  'preview_fps': '限制预览帧率 FPS',
+  'fps_unlimited': '无限制 Unlimited',
 
   // Right panel — Post FX
   'shake': '抖动 Shake',
@@ -51,7 +96,7 @@ export const zh = {
   'timer_label': '计时 Time',
 
   // Right panel — Export
-  'export': '导出 Export',
+  'export': '导出',
   'copy_url': '复制 URL',
 
   // Right panel — Live mode
@@ -232,8 +277,22 @@ export const zh = {
   'copy_url_tip': '生成可直接粘贴到 OBS 浏览器源的 URL，自动隐藏面板 / 透明背景 / 加载指定模板',
 
   // Footer
-  'footer_desc': '日式PV Visual生成',
+  'footer_desc': 'PV Producer Tool',
   'footer_contributors': '贡献者',
+
+  // AI Generator Panel
+  'ai_panel': 'AI 灵感生成',
+  'ai_prompt_placeholder': '输入画面意境或歌词风格描述... (例如：赛博朋克、红黑强烈对比、代码雨)',
+  'ai_generate_btn': 'AI 灵感生成',
+  'ai_generating': '生成中...',
+  'ai_settings': 'API 配置 Settings',
+  'ai_api_key': 'API 密钥 Key',
+  'ai_api_url': 'API 地址 URL',
+  'ai_api_model': '模型名称 Model',
+  'ai_generate_success': 'AI 特效生成成功！',
+  'ai_generate_error': '生成失败，请检查 API 密钥或网络配置。',
+  'ai_key_required': '请先在下方 API 配置中填写 API 密钥。',
+  'ai_conceiving': '构想中...',
 } as const;
 
 export type LocaleKey = keyof typeof zh;

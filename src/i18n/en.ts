@@ -2,17 +2,60 @@ import type { LocaleKey } from './zh';
 
 export const en: Record<LocaleKey, string> = {
   // Page
-  'page_title': 'PV Tool - Japanese PV Visual Generator',
+  'page_title': 'PV Producer Tool - Japanese PV Visual Generator',
+  'brand_title': 'PV Producer Tool',
+
+  // Nav titles + subtitle (EN locale: title only, empty subtitle)
+  'nav_template': 'Template',
+  'nav_template_sub': '',
+  'nav_playback': 'Playback & Media',
+  'nav_playback_sub': '',
+  'nav_shots': 'Shots',
+  'nav_shots_sub': '',
+  'nav_postfx': 'Post FX',
+  'nav_postfx_sub': '',
+  'nav_effects': 'Effects',
+  'nav_effects_sub': '',
+  'nav_ai': 'AI Generator',
+  'nav_ai_sub': '',
+  'nav_export': 'Export',
+  'nav_export_sub': '',
+  'nav_settings': 'Settings',
+  'nav_settings_sub': '',
 
   // Panel titles
   'postfx': 'Post FX',
   'effects_library': 'Effects Library',
+  'theme_light': 'Light Theme',
+
+  // Still-image shots
+  'shots_need_image': 'Load a still image in "Playback & Media" first',
+  'shot_hint': 'Drag on the image to frame a shot; drag inside to move, bottom-right corner to resize',
+  'shot_in': 'In',
+  'shot_out': 'Out',
+  'shot_motion': 'Motion',
+  'shot_clear': 'Clear',
+  'shot_preview': 'Preview',
+  'tr_cut': 'Cut',
+  'tr_fade': 'Fade',
+  'tr_slide': 'Slide',
+  'tr_zoom': 'Zoom',
+  'mo_none': 'Static',
+  'mo_zoomIn': 'Zoom In',
+  'mo_zoomOut': 'Zoom Out',
+  'mo_panLeft': 'Pan Left',
+  'mo_panRight': 'Pan Right',
+  'mo_panUp': 'Pan Up',
+  'mo_panDown': 'Pan Down',
 
   // Left panel
   'template': 'Template',
   'custom': '✦ Custom',
   'canvas_color': 'Canvas Color',
   'follow_template': 'Follow Template',
+  'font_label': 'Font',
+  'load_local_fonts': 'Load local fonts',
+  'load_fonts_failed': 'Failed to load local fonts (permission denied?)',
   'text_label': 'Text (split with /)',
   'expand': 'Expand',
   'collapse': 'Collapse',
@@ -30,8 +73,12 @@ export const en: Record<LocaleKey, string> = {
   'play': '▶ Play',
   'playing': '♪ Playing',
   'paused': '⏹ Paused',
+  'lyric_prev': 'Previous line',
+  'lyric_next': 'Next line',
   'bpm': 'BPM',
   'beat_react': 'Beat React',
+  'preview_fps': 'Limit Preview FPS',
+  'fps_unlimited': 'Unlimited',
 
   // Right panel — Post FX
   'shake': 'Shake',
@@ -233,6 +280,20 @@ export const en: Record<LocaleKey, string> = {
   'copy_url_tip': '',
 
   // Footer
-  'footer_desc': 'Japanese PV Visual Generator',
+  'footer_desc': 'PV Producer Tool',
   'footer_contributors': 'Contributors',
+
+  // AI Generator Panel
+  'ai_panel': 'AI Generator',
+  'ai_prompt_placeholder': 'Describe style, emotions, or lyrics... (e.g. Cyberpunk, high-contrast red/black, code rain)',
+  'ai_generate_btn': 'Generate via AI',
+  'ai_generating': 'Generating...',
+  'ai_settings': 'API Settings',
+  'ai_api_key': 'API Key',
+  'ai_api_url': 'API Base URL',
+  'ai_api_model': 'Model Name',
+  'ai_generate_success': 'AI generation successful!',
+  'ai_generate_error': 'Generation failed. Please check API settings or network.',
+  'ai_key_required': 'Please fill in the API Key in settings first.',
+  'ai_conceiving': 'Conceiving...',
 };

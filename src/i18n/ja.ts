@@ -2,17 +2,60 @@ import type { LocaleKey } from './zh';
 
 export const ja: Record<LocaleKey, string> = {
   // Page
-  'page_title': 'PV Tool - PVビジュアルジェネレーター',
+  'page_title': 'PV Producer Tool - PVビジュアルジェネレーター',
+  'brand_title': 'PV Producer Tool',
+
+  // Nav titles + English subtitle
+  'nav_template': 'テンプレート',
+  'nav_template_sub': 'Template',
+  'nav_playback': '再生と素材',
+  'nav_playback_sub': 'Media',
+  'nav_shots': 'カット割り',
+  'nav_shots_sub': 'Shots',
+  'nav_postfx': 'ポスト',
+  'nav_postfx_sub': 'Post FX',
+  'nav_effects': 'エフェクト',
+  'nav_effects_sub': 'Effects',
+  'nav_ai': 'AI ジェネレーター',
+  'nav_ai_sub': 'AI Gen',
+  'nav_export': '書き出し',
+  'nav_export_sub': 'Export',
+  'nav_settings': '設定',
+  'nav_settings_sub': 'Settings',
 
   // Panel titles
-  'postfx': 'ポスト Post FX',
-  'effects_library': 'エフェクト Effects',
+  'postfx': 'ポスト',
+  'effects_library': 'エフェクト',
+  'theme_light': 'ライトテーマ',
+
+  // 静止画カット割り
+  'shots_need_image': '先に「再生と素材」で静止画を読み込んでください',
+  'shot_hint': '画像上をドラッグして切り取り範囲を指定。枠内ドラッグで移動、右下で拡縮',
+  'shot_in': 'イン In',
+  'shot_out': 'アウト Out',
+  'shot_motion': 'モーション Motion',
+  'shot_clear': '削除',
+  'shot_preview': 'プレビュー',
+  'tr_cut': 'カット Cut',
+  'tr_fade': 'フェード Fade',
+  'tr_slide': 'スライド Slide',
+  'tr_zoom': 'ズーム Zoom',
+  'mo_none': '静止',
+  'mo_zoomIn': 'ズームイン',
+  'mo_zoomOut': 'ズームアウト',
+  'mo_panLeft': '左パン',
+  'mo_panRight': '右パン',
+  'mo_panUp': '上パン',
+  'mo_panDown': '下パン',
 
   // Left panel
-  'template': 'テンプレート Template',
+  'template': 'テンプレート',
   'custom': '✦ カスタム Custom',
   'canvas_color': 'キャンバス色 Canvas',
   'follow_template': 'テンプレに従う',
+  'font_label': 'フォント Font',
+  'load_local_fonts': 'ローカルフォントを取得',
+  'load_fonts_failed': 'フォントの取得に失敗しました（権限が拒否された可能性）',
   'text_label': 'テキスト Text（/で分割）',
   'expand': '展開',
   'collapse': '折る',
@@ -30,8 +73,12 @@ export const ja: Record<LocaleKey, string> = {
   'play': '▶ 再生',
   'playing': '♪ 再生中',
   'paused': '⏹ 停止中',
+  'lyric_prev': '前の行',
+  'lyric_next': '次の行',
   'bpm': 'BPM',
   'beat_react': 'ビート反応 Beat React',
+  'preview_fps': 'プレビューFPS制限',
+  'fps_unlimited': '無制限',
 
   // Right panel — Post FX
   'shake': 'シェイク Shake',
@@ -53,7 +100,7 @@ export const ja: Record<LocaleKey, string> = {
   'timer_label': 'タイマー Time',
 
   // Right panel — Export
-  'export': '書き出し Export',
+  'export': '書き出し',
   'copy_url': 'URL をコピー',
 
   // Right panel — Listen
@@ -234,6 +281,20 @@ export const ja: Record<LocaleKey, string> = {
   'copy_url_tip': '',
 
   // Footer
-  'footer_desc': 'PVビジュアルジェネレーター',
+  'footer_desc': 'PV Producer Tool',
   'footer_contributors': 'コントリビューター',
+
+  // AI Generator Panel
+  'ai_panel': 'AI ジェネレーター',
+  'ai_prompt_placeholder': '画面の雰囲気や歌詞のスタイルを入力... (例：サイバーパンク、赤黒の強烈なコントラスト、コードレイン)',
+  'ai_generate_btn': 'AIで生成',
+  'ai_generating': '生成中...',
+  'ai_settings': 'API設定',
+  'ai_api_key': 'APIキー',
+  'ai_api_url': 'APIベースURL',
+  'ai_api_model': 'モデル名',
+  'ai_generate_success': 'AI生成に成功しました！',
+  'ai_generate_error': '生成に失敗しました。APIキーまたはネットワーク設定を確認してください。',
+  'ai_key_required': '先に設定でAPIキーを入力してください。',
+  'ai_conceiving': '構想中...',
 };

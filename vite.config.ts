@@ -1,9 +1,11 @@
 import { defineConfig } from 'vite';
-import FullReload from 'vite-plugin-full-reload';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   base: process.env.VITE_BASE ?? '/pv-tool/',
   plugins: [
-    FullReload(['src/**/*']),
+    svelte(),
+    tailwindcss(),
   ],
 });

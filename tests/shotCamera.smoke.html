@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<!-- PV Tool — Copyright (c) 2026 DanteAlighieri13210914
+     Licensed under Non-Commercial License. See LICENSE for terms.
+
+     分镜相机浏览器集成冒烟：真实 PVEngine + 超限大图 + 分镜播放。
+     用 vite dev server 打开：
+       npm run dev  →  http://localhost:5173/pv-tool/tests/shotCamera.smoke.html
+     通过时 console 输出 SHOT-SMOKE-PASS。 -->
+<html lang="en">
+<head><meta charset="UTF-8"><title>shot camera smoke</title></head>
+<body>
+<div id="stage" style="width:800px;height:450px"></div>
+<script type="module">
+  import { PVEngine } from '../src/core/engine.ts';
+  import { templates } from '../src/templates/index.ts';
+
+  const assert = (cond, msg) => { if (!cond) throw new Error('SMOKE FAIL: ' + msg); };
+
+  try {
+    const engine = new PVEngine();
+    await engine.init(document.getElementById('stage'));
+    engine.loadTemplate(templates[0]);
+    engine.setText('line one/line two/line three');
+
+    // 6000×4000 超过常见 4096 上限的测试图
+    const c = document.createElement('canvas');
+    c.width = 6000; c.height = 4000;
+    const g = c.getContext('2d');
+    const grad = g.createLinearGradient(0, 0, 6000, 4000);
+    grad.addColorStop(0, '#ff0055'); grad.addColorStop(1, '#0055ff');
+    g.fillStyle = grad; g.fillRect(0, 0, 6000, 4000);
+
+    const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+    await engine.addMedia(new File([blob], 't.png', { type: 'image/png' }), 'fit');
+
+    assert(engine.sourceImage, 'sourceImage retained');
+    assert(engine.sourceImage.naturalWidth === 6000, 'sourceImage keeps full resolution');
+    assert(engine.maxTextureSize >= 2048, 'GPU max texture size queried');
+
+    engine.setShots([
+      { rect: { x: 0.05, y: 0.05, w: 0.3, h: 0.3 }, in: 'fade', out: 'fade', motion: 'zoomIn' },
+      null,
+      { rect: { x: 0.6, y: 0.5, w: 0.35, h: 0.4 }, in: 'slide', out: 'zoom', motion: 'panRight' },
+    ]);
+    assert(engine.shotsActive, 'shots active after setShots');
+    assert(engine.segmentTexts.length === 3, 'segmentTexts follows text segments');
+
+    // 播放跨越三段（segmentDuration 默认 3s）：逐点 seek + 等待渲染。
+    // 用 setTimeout 而非 rAF：无头浏览器的虚拟时钟不驱动 rAF。
+    for (const tSec of [0.1, 1.5, 3.5, 6.2, 8.9]) {
+      engine.seek(tSec);
+      await new Promise((r) => setTimeout(r, 120));
+    }
+
+    console.log('SHOT-SMOKE-PASS');
+  } catch (err) {
+    console.error('SHOT-SMOKE-FAIL', err);
+  }
+</script>
+</body>
+</html>

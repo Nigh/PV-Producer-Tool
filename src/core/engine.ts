@@ -2,7 +2,8 @@
 // Licensed under Non-Commercial License. See LICENSE for terms.
 
 import * as PIXI from 'pixi.js';
-import type { TemplateConfig, UpdateContext, ColorPalette, LayerType, MotionTargetInfo, LyricLine } from './types';
+import type { TemplateConfig, UpdateContext, ColorPalette, LayerType, MotionTargetInfo, LyricLine, Shot } from './types';
+import { ShotCamera } from './shotCamera';
 import { createEffect, BaseEffect } from '../effects';
 import { extractDominantColors } from './colorExtractor';
 import { MediaOutlineRenderer } from './mediaOutline';
@@ -52,6 +53,10 @@ export class PVEngine {
   private _glitch = 0;
 
   private mediaElement: HTMLVideoElement | HTMLImageElement | null = null;
+  /** 原始全分辨率图片（不降采样），分镜相机从这里现切纹理。 */
+  private originalImage: HTMLImageElement | null = null;
+  private shotCamera: ShotCamera | null = null;
+  private _shots: (Shot | null)[] = [];
   private outlineRenderer: MediaOutlineRenderer | null = null;
   private _outlineEnabled = false;
   private extractingColors = false;
@@ -72,11 +77,16 @@ export class PVEngine {
   private _resizeParent: HTMLElement | null = null;
   private _loading = false;
   private _bgColorOverride: string | null = null;
+  private _fontFamilyOverride: string | null = null;
   private _tick = 0;
   private _playbackTime = 0;
   private _paused = false;
   private _time = 0;
   private _lastFrameTime = 0;
+  private _fpsFrames = 0;
+  private _fpsWindowStart = 0;
+  /** Called about once per second with the measured render FPS. */
+  onFpsUpdate: ((fps: number) => void) | null = null;
 
   // Now Playing state
   private npProvider: NowPlayingProvider | null = null;
@@ -138,6 +148,14 @@ export class PVEngine {
       const dt = (now - this._lastFrameTime) / 1000;
       this._lastFrameTime = now;
 
+      // Measured FPS, reported once per second for the UI readout.
+      this._fpsFrames++;
+      if (now - this._fpsWindowStart >= 1000) {
+        this.onFpsUpdate?.(Math.round((this._fpsFrames * 1000) / (now - this._fpsWindowStart)));
+        this._fpsFrames = 0;
+        this._fpsWindowStart = now;
+      }
+
       if (!this._paused) {
         if (this._npActive) {
           // In Now Playing mode, advance time locally when not paused
@@ -152,16 +170,23 @@ export class PVEngine {
         }
       }
 
-      // ticker.deltaTime is normalised to "1 = 1 frame at maxFPS"; divide
-      // by maxFPS to convert to real seconds. Reading maxFPS dynamically
-      // (instead of hardcoding 60) keeps the conversion correct if the
-      // ticker target is ever retuned.
-      const targetFps = this.app.ticker.maxFPS || 60;
-      this.update(this._time, this._paused ? 0 : ticker.deltaTime / targetFps);
+      // ticker.deltaMS is real elapsed milliseconds. Do NOT derive seconds
+      // from ticker.deltaTime / maxFPS: Pixi normalises deltaTime against a
+      // fixed 60fps target (Ticker.targetFPMS), so that conversion is only
+      // correct at 60fps and breaks once previewFps throttles the ticker.
+      this.update(this._time, this._paused ? 0 : ticker.deltaMS / 1000);
     });
   }
 
   get paused() { return this._paused; }
+  /**
+   * 当前已加载模板的原始配置引用。
+   *
+   * UI 层用它作为保存/分享/Custom 编辑的模板基底，再叠加 engine 当前运行态
+   * slider 参数生成快照。这里刻意只暴露 getter，不在引擎内处理持久化逻辑，
+   * 保持 PVEngine 只负责渲染和运行状态。
+   */
+  get currentTemplateConfig() { return this.currentTemplate; }
 
   pause() {
     this._paused = true;
@@ -227,6 +252,13 @@ export class PVEngine {
         if (this.userText) {
           config._userText = this.textSegments[0] || this.userText;
         }
+        if (this._fontFamilyOverride) {
+          // Prepend so the user's font wins but the effect's own stack
+          // stays as fallback for glyphs the local font doesn't cover.
+          config.fontFamily = config.fontFamily
+            ? `${this._fontFamilyOverride}, ${config.fontFamily}`
+            : `${this._fontFamilyOverride}, "Noto Serif JP", "Yu Mincho", serif`;
+        }
 
         try {
           const effect = createEffect(entry.type, layer, config, this.palette, this.app.renderer);
@@ -242,6 +274,10 @@ export class PVEngine {
         this._tilt = template.postfx.tilt ?? 0;
         this.glitch = template.postfx.glitch ?? 0;
         this.hueShift = template.postfx.hueShift ?? 0;
+      }
+
+      if (template.shots) {
+        this.setShots(template.shots);
       }
 
       this.syncOutline();
@@ -274,6 +310,131 @@ export class PVEngine {
 
   set segmentDuration(val: number) { this._segmentDuration = val; }
   get segmentDuration() { return this._segmentDuration; }
+
+  /**
+   * GPU 实际允许的最大纹理边长。WebGL 从 context 查询，WebGPU 读 device
+   * limits，均不可用时退回 4096。
+   * ponytail: 上限夹到 8192 —— 16384² RGBA 单纹理就要 1GB 显存；
+   * 需要更高精度时靠分镜相机按取景框现切，而不是抬高整图纹理。
+   */
+  get maxTextureSize(): number {
+    const r = this.app.renderer as any;
+    const gl: WebGLRenderingContext | undefined = r?.gl;
+    const size = gl?.getParameter?.(gl.MAX_TEXTURE_SIZE)
+      ?? r?.device?.limits?.maxTextureDimension2D
+      ?? 4096;
+    return Math.min(size, 8192);
+  }
+
+  /** 设置静止画分镜列表（按歌词行/文本段索引对齐，可稀疏）。 */
+  setShots(shots: (Shot | null)[]): void {
+    this._shots = shots;
+    this.syncShotCamera();
+  }
+
+  get shots(): (Shot | null)[] {
+    return this._shots;
+  }
+
+  /** 是否具备分镜播放条件（已载入静态图且至少一个分镜）。 */
+  get shotsActive(): boolean {
+    return !!this.shotCamera?.enabled;
+  }
+
+  /** 分镜相机取景用的原始全分辨率图片（仅静态图媒体时非空）。 */
+  get sourceImage(): HTMLImageElement | null {
+    return this.originalImage;
+  }
+
+  /** 分镜编辑器用：当前时间轴的全部行文本（歌词 / SRT / 纯文本段）。 */
+  get segmentTexts(): string[] {
+    if (this._srtTimeline) return this._srtTimeline.map(e => e.text);
+    if (this.lyricTimeline && this.lyricTimeline.length > 0) {
+      return this.lyricTimeline.map(l => l.text);
+    }
+    return this.textSegments;
+  }
+
+  /** 分镜编辑器用：指定行的起始播放时间（秒），供预览跳转。 */
+  segmentStartTime(index: number): number {
+    if (this._srtTimeline) return (this._srtTimeline[index]?.startMs ?? 0) / 1000;
+    if (this.lyricTimeline && this.lyricTimeline.length > 0) {
+      return (this.lyricTimeline[index]?.time ?? 0) - this.lyricOffsetSeconds;
+    }
+    return index * this._segmentDuration;
+  }
+
+  /** 当前播放所在的文本段/歌词行索引（段开始前为 -1）。 */
+  get currentSegmentIndex(): number {
+    return this.currentSegmentInfo(this._playbackTime).index;
+  }
+
+  /** 跳到上一句/段起点；已在首句则停在首句。 */
+  seekPrevSegment(): void {
+    const idx = Math.max(0, this.currentSegmentIndex);
+    this.seek(this.segmentStartTime(Math.max(0, idx - 1)));
+  }
+
+  /** 跳到下一句/段起点；已在末句则停在末句。 */
+  seekNextSegment(): void {
+    const n = this.segmentTexts.length;
+    if (n === 0) return;
+    const idx = Math.max(0, this.currentSegmentIndex);
+    this.seek(this.segmentStartTime(Math.min(n - 1, idx + 1)));
+  }
+
+  private syncShotCamera(): void {
+    const hasShots = this._shots.some((s) => !!s);
+    if (!this.originalImage || !hasShots) {
+      this.shotCamera?.setShots(this._shots);
+      if (this.shotCamera) this.shotCamera.container.visible = false;
+      this.setBaseMediaVisible(true);
+      return;
+    }
+    if (!this.shotCamera) {
+      this.shotCamera = new ShotCamera();
+    }
+    this.shotCamera.setMaxTextureSize(this.maxTextureSize);
+    this.shotCamera.attach(this.layers.get('media')!);
+    this.shotCamera.setImage(this.originalImage);
+    this.shotCamera.setShots(this._shots);
+    this.setBaseMediaVisible(false);
+  }
+
+  /** 分镜启用时隐藏整图基底 sprite（media 层 children[0]）。 */
+  private setBaseMediaVisible(visible: boolean): void {
+    const base = this.layers.get('media')?.children[0];
+    if (base && base !== this.shotCamera?.container) {
+      base.visible = visible;
+    }
+  }
+
+  /**
+   * 当前文本段索引与段时长（秒）。歌词时间轴用行间隔，SRT 用条目区间，
+   * 纯文本按 segmentDuration 均分循环。首行歌词之前 index 为 -1。
+   */
+  private currentSegmentInfo(time: number): { index: number; duration: number } {
+    if (this._srtTimeline) {
+      const ms = time * 1000;
+      const idx = this._srtTimeline.findIndex(e => ms >= e.startMs && ms < e.endMs);
+      if (idx < 0) return { index: -1, duration: this._segmentDuration };
+      const e = this._srtTimeline[idx];
+      return { index: idx, duration: Math.max(0.1, (e.endMs - e.startMs) / 1000) };
+    }
+    if (this.lyricTimeline && this.lyricTimeline.length > 0) {
+      const t = Math.max(0, time + this.lyricOffsetSeconds);
+      if (t < this.lyricTimeline[0].time) return { index: -1, duration: this._segmentDuration };
+      const idx = this.lyricCursor;
+      const next = this.lyricTimeline[idx + 1];
+      const duration = next
+        ? Math.max(0.1, next.time - this.lyricTimeline[idx].time)
+        : this._segmentDuration;
+      return { index: idx, duration };
+    }
+    const n = this.textSegments.length;
+    const index = n > 1 ? Math.floor(time / this._segmentDuration) % n : 0;
+    return { index, duration: this._segmentDuration };
+  }
 
   setSrtTimeline(entries: { startMs: number; endMs: number; text: string }[] | null) {
     this._srtTimeline = entries;
@@ -571,6 +732,20 @@ export class PVEngine {
   set beatReactivity(val: number) { this._beatReactivity = val; }
   get beatReactivity() { return this._beatReactivity; }
 
+  /** Global font override (CSS family string); null = follow template. */
+  set fontFamily(font: string | null) {
+    if (font === this._fontFamilyOverride) return;
+    this._fontFamilyOverride = font;
+    // Effects bake fontFamily into their text objects at setup, so the
+    // only way to apply the override is to rebuild the current template.
+    if (this.currentTemplate) this.loadTemplate(this.currentTemplate);
+  }
+  get fontFamily() { return this._fontFamilyOverride; }
+
+  /** Preview frame-rate cap; 0 means unlimited (display refresh rate). */
+  set previewFps(fps: number) { this.app.ticker.maxFPS = fps > 0 ? fps : 0; }
+  get previewFps() { return this.app.ticker.maxFPS; }
+
   set canvasColor(color: string | null) {
     this._bgColorOverride = color;
     if (color) {
@@ -601,7 +776,11 @@ export class PVEngine {
     try {
       const mediaLayer = this.layers.get('media')!;
       this.destroyOutline();
+      // 先摘除分镜相机容器，避免被下面的 removeChildren+destroy 连带销毁
+      this.shotCamera?.detach();
       mediaLayer.removeChildren().forEach(c => c.destroy({ children: true }));
+      this.originalImage = null;
+      this.shotCamera?.setImage(null);
 
       const isVideo = file.type.startsWith('video/');
 
@@ -645,8 +824,10 @@ export class PVEngine {
           img.onerror = () => reject(new Error('Image load failed'));
         });
 
-        // Downscale if image exceeds WebGL max texture size (typically 4096 or 8192)
-        const maxDim = 4096;
+        this.originalImage = img;
+
+        // Downscale if image exceeds the GPU's actual max texture size
+        const maxDim = this.maxTextureSize;
         if (img.naturalWidth > maxDim || img.naturalHeight > maxDim) {
           const downscale = maxDim / Math.max(img.naturalWidth, img.naturalHeight);
           const canvas = document.createElement('canvas');
@@ -683,6 +864,8 @@ export class PVEngine {
         sprite.x = this.app.screen.width / 2;
         sprite.y = this.app.screen.height / 2;
         mediaLayer.addChild(sprite);
+
+        this.syncShotCamera();
       }
 
       if (this.currentTemplate?.features?.autoExtractColors) {
@@ -904,7 +1087,9 @@ export class PVEngine {
     const ctx: UpdateContext = {
       time,
       deltaTime,
-      fps: this.app.ticker.maxFPS,
+      // maxFPS is 0 when unthrottled; fall back to 60 so effects that
+      // convert frame counts to seconds (e.g. filmGrain) never divide by 0.
+      fps: this.app.ticker.maxFPS || 60,
       screenWidth: this.app.screen.width,
       screenHeight: this.app.screen.height,
       palette: this.palette,
@@ -915,6 +1100,14 @@ export class PVEngine {
       beatIntensity: this.beat.getIntensity(time) * this._beatReactivity,
       motionTargets: this.motionTargets,
     };
+
+    if (this.shotCamera?.enabled) {
+      const seg = this.currentSegmentInfo(lyricClock);
+      this.shotCamera.update(
+        seg.index, ctx.segmentTime, seg.duration,
+        ctx.screenWidth, ctx.screenHeight,
+      );
+    }
 
     this.updateBgFill();
     this.applyCameraFX(time);

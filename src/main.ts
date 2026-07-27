@@ -1,5 +1,12 @@
 // PV Tool — Copyright (c) 2026 DanteAlighieri13210914
 // Licensed under Non-Commercial License. See LICENSE for terms.
+//
+// 主入口文件承担 UI、模板状态、分享码导入导出和 PVEngine 的连接工作。
+// 这里有几类模板状态需要特别区分：
+// 1. 内置模板：只需要 URL 参数 `t=` 指向模板索引。
+// 2. 用户/AI 模板：配置可能包含 AI 生成的精细 effect.config，分享时必须序列化完整模板。
+// 3. URL 分享模板：通过 `code=` 临时打开，不能自动写入 localStorage，避免刷新或 OBS 嵌入时制造重复模板。
+// 4. Custom 编辑态：应在当前模板基础上编辑，保留已有 effect 参数；只有新增效果才回退到 catalog 默认值。
 
 import './style.css';
 import { PVEngine } from './core/engine';
@@ -16,6 +23,7 @@ import {
 } from './core/templateStore';
 import { testNowPlayingConnection } from './core/nowPlayingProvider';
 import { initCopyUrlButton } from './core/copyUrl';
+import { generateConfigFromAI } from './core/aiService';
 import { showToast, attachModalDismiss } from './core/uiHelpers';
 import { initTemplateButtons, rebuildTemplateButtons } from './core/templateButtons';
 
@@ -30,6 +38,23 @@ function tplName(tpl: TemplateConfig): string {
     return t(tpl.nameKey as any);
   }
   return tpl.name;
+}
+
+/**
+ * 对会写入 innerHTML 的模板名做最小 HTML 转义。
+ *
+ * AI 生成模板名、分享码模板名和用户自定义模板名都属于外部输入。
+ * 下拉框 option 目前通过字符串拼接生成，因此插入前必须转义，避免
+ * `<img onerror=...>` 这类名称被浏览器当成 HTML 解析。
+ */
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[ch]!);
 }
 
 function showModal(contentHtml: string, confirmText: string): void {
@@ -57,7 +82,7 @@ app.innerHTML = `
         <summary class="panel-title">${t('template')}</summary>
       <div class="control-group">
           <select id="template-select">
-            ${templates.map((tp, i) => `<option value="${i}">${tplName(tp)}</option>`).join('')}
+            ${templates.map((tp, i) => `<option value="${i}">${escapeHtml(tplName(tp))}</option>`).join('')}
             <option value="custom">${t('custom')}</option>
           </select>
           <div class="template-actions">
@@ -261,6 +286,29 @@ app.innerHTML = `
         </div>
       </details>
       ` : ''}
+
+      <details class="collapsible-section" open>
+        <summary class="panel-title">${t('ai_panel')}</summary>
+        <div class="control-group">
+          <textarea id="ai-prompt-input" rows="3" placeholder="${t('ai_prompt_placeholder')}"></textarea>
+          <button id="ai-generate-btn" class="btn">${t('ai_generate_btn')}</button>
+        </div>
+        <details class="collapsible-section ai-settings">
+          <summary class="panel-title">⚙️ ${t('ai_settings')}</summary>
+          <div class="control-group">
+            <label>${t('ai_api_key')}</label>
+            <input type="password" id="ai-api-key" placeholder="sk-...">
+          </div>
+          <div class="control-group">
+            <label>${t('ai_api_url')}</label>
+            <input type="text" id="ai-api-url" placeholder="https://api.deepseek.com">
+          </div>
+          <div class="control-group">
+            <label>${t('ai_api_model')}</label>
+            <input type="text" id="ai-api-model" placeholder="deepseek-v4-flash">
+          </div>
+        </details>
+      </details>
     </div>
 
     <div class="controls controls-bottom" id="custom-panel" style="display:none">
@@ -331,36 +379,58 @@ app.innerHTML = `
 const engine = new PVEngine();
 const container = document.getElementById('pv-container')!;
 
-engine.init(container).then(() => {
+engine.init(container).then(async () => {
   engine.setText('深夜東京/の6畳半夢/を見てた/灯りの灯らない蛍光灯/明日には消えてる電脳城/に/開幕戦/打ち上げて/いなくなんないよね/ここには誰もいない/ここには誰もいないから');
 
   const urlParams = new URLSearchParams(window.location.search);
 
-  // URL param: t (template)
-  const tParam = urlParams.get('t');
-  if (tParam !== null) {
-    if (tParam.startsWith('user-')) {
-      const idx = parseInt(tParam.split('-')[1]);
-      if (idx >= 0 && idx < customTemplates.length) {
-        engine.loadTemplate(customTemplates[idx]);
-        templateSelect.value = tParam;
-      } else {
-        engine.loadTemplate(templates[0]);
-        templateSelect.value = '0';
-      }
-    } else {
-      const idx = parseInt(tParam);
-      if (!isNaN(idx) && idx >= 0 && idx < templates.length) {
-        engine.loadTemplate(templates[idx]);
-        templateSelect.value = String(idx);
-      } else {
-        engine.loadTemplate(templates[0]);
-        templateSelect.value = '0';
-      }
+  // URL param: code (custom template share code)
+  const codeParam = urlParams.get('code');
+  if (codeParam !== null) {
+    try {
+      const decodedTpl = await decodeShareCode(codeParam);
+      // 分享链接用于“打开看看/OBS 嵌入/跨设备预览”等临时场景。
+      // 因此这里只放入一个临时 shared 选项并加载到引擎，不写入
+      // customTemplates/localStorage，避免每次刷新都产生一份重复模板。
+      sharedUrlTemplate = cloneTemplateConfig(decodedTpl);
+      rebuildTemplateSelect();
+      templateSelect.value = 'shared';
+      isCustomMode = false;
+      customPanel.style.display = 'none';
+      engine.loadTemplate(sharedUrlTemplate);
+      syncCustomCheckboxes(sharedUrlTemplate);
+    } catch (err) {
+      console.warn('[PV] Failed to load config from URL code parameter:', err);
+      engine.loadTemplate(templates[0]);
+      templateSelect.value = '0';
     }
   } else {
-    engine.loadTemplate(templates[0]);
-    templateSelect.value = '0';
+    // URL param: t (template)
+    const tParam = urlParams.get('t');
+    if (tParam !== null) {
+      if (tParam.startsWith('user-')) {
+        const idx = parseInt(tParam.split('-')[1]);
+        if (idx >= 0 && idx < customTemplates.length) {
+          engine.loadTemplate(customTemplates[idx]);
+          templateSelect.value = tParam;
+        } else {
+          engine.loadTemplate(templates[0]);
+          templateSelect.value = '0';
+        }
+      } else {
+        const idx = parseInt(tParam);
+        if (!isNaN(idx) && idx >= 0 && idx < templates.length) {
+          engine.loadTemplate(templates[idx]);
+          templateSelect.value = String(idx);
+        } else {
+          engine.loadTemplate(templates[0]);
+          templateSelect.value = '0';
+        }
+      }
+    } else {
+      engine.loadTemplate(templates[0]);
+      templateSelect.value = '0';
+    }
   }
 
   syncSpeedSlider();
@@ -436,28 +506,110 @@ const customPanel = document.getElementById('custom-panel')!;
 const effectGrid = document.getElementById('effect-grid')!;
 
 let isCustomMode = false;
+let customTemplates = loadCustomTemplates();
+let sharedUrlTemplate: TemplateConfig | null = null;
 
+/**
+ * JSON 结构深拷贝工具。
+ *
+ * TemplateConfig/EffectEntry 当前只包含纯 JSON 数据，适合用这种方式克隆。
+ * 复制模板快照时不要保留原对象引用，否则后续 Custom 重建、保存或分享
+ * 可能意外改到当前引擎正在使用的模板对象。
+ */
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/**
+ * 克隆完整模板配置。
+ *
+ * 单独封装一层，让调用处明确表达“这里需要模板级快照”。
+ */
+function cloneTemplateConfig(template: TemplateConfig): TemplateConfig {
+  return cloneJson(template);
+}
+
+/**
+ * 从模板基底生成“当前运行态快照”。
+ *
+ * 模板对象保存的是初始配置，而 UI slider 和播放面板会在运行时修改
+ * engine 上的 bpm、animationSpeed、bgOpacity、postfx 等字段。保存、
+ * 导出分享码或复制 URL 时，用户期望拿到的是屏幕上正在看的效果，
+ * 所以这里以模板为基底，再用 engine 当前值覆盖这些运行态参数。
+ */
+function buildRuntimeTemplateSnapshot(base: TemplateConfig, name = base.name): TemplateConfig {
+  const snapshot = cloneTemplateConfig(base);
+  snapshot.name = name;
+  snapshot.bpm = engine.beat.bpm;
+  snapshot.animationSpeed = engine.animationSpeed;
+  snapshot.bgOpacity = engine.effectOpacity;
+  snapshot.postfx = {
+    shake: engine.shake,
+    zoom: engine.zoom,
+    tilt: engine.tilt,
+    glitch: engine.glitch,
+    hueShift: engine.hueShift
+  };
+  return snapshot;
+}
+
+/**
+ * 根据 Custom 面板的勾选状态生成自定义模板。
+ *
+ * 关键点：不能简单地按 checkbox 从 effectCatalog 重建所有效果。
+ * AI 生成模板和分享模板往往会在 effect.config 里写入颜色、透明度、
+ * 速度、形态等细节参数；如果切到 Custom 就全部套回 catalog 默认值，
+ * 画面会明显变样。这里先把当前模板已有 effects 建成可消费的池子，
+ * 勾选项命中已有 effect 时复用其完整 config；只有新增勾选的效果
+ * 才使用 catalog preset 默认配置。
+ */
 function buildCustomTemplate(): TemplateConfig {
+  const curTpl = engine.currentTemplateConfig;
+  const existingEffects = new Map<string, TemplateConfig['effects']>();
+  curTpl?.effects.forEach((effect) => {
+    const key = effectSelectionKey(effect);
+    const pool = existingEffects.get(key) ?? [];
+    pool.push(cloneJson(effect));
+    existingEffects.set(key, pool);
+  });
+
   const checks = effectGrid.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
   const effects: TemplateConfig['effects'] = [];
   checks.forEach((cb) => {
     if (cb.checked) {
       const idx = parseInt(cb.dataset.effectIdx!);
       const preset = effectCatalog[idx];
-      effects.push({ type: preset.type, layer: preset.layer, config: { ...preset.config } });
+      const existingPool = existingEffects.get(effectSelectionKey(preset));
+      const existing = existingPool?.shift();
+      effects.push(existing ?? { type: preset.type, layer: preset.layer, config: { ...preset.config } });
     }
   });
-  return {
-    name: 'Custom',
-    palette: {
-      background: '#ffffff',
-      primary: '#000000',
-      secondary: '#888888',
-      accent: '#ff3366',
-      text: '#000000',
-    },
-    effects,
-  };
+
+  const template = curTpl
+    ? buildRuntimeTemplateSnapshot(curTpl, 'Custom')
+    : {
+      name: 'Custom',
+      palette: {
+        background: '#ffffff',
+        primary: '#000000',
+        secondary: '#888888',
+        accent: '#ff3366',
+        text: '#000000',
+      },
+      effects,
+      bpm: engine.beat.bpm,
+      animationSpeed: engine.animationSpeed,
+      bgOpacity: engine.effectOpacity,
+      postfx: {
+        shake: engine.shake,
+        zoom: engine.zoom,
+        tilt: engine.tilt,
+        glitch: engine.glitch,
+        hueShift: engine.hueShift
+      },
+    };
+  template.effects = effects;
+  return template;
 }
 
 function syncSpeedSlider() {
@@ -490,6 +642,62 @@ function syncPostfxSliders() {
   hu.value = String(engine.hueShift); hv.textContent = `${engine.hueShift.toFixed(0)}°`;
 }
 
+/**
+ * 根据模板配置同步 Custom 面板的 checkbox。
+ *
+ * 大多数效果用 type 就能唯一识别；organicBlob 在 catalog 中有 blob/wave/cloud
+ * 多个同 type 变体，因此需要 effectSelectionKey 把 shape 也纳入匹配，
+ * 否则加载其中一个变体时会把同 type 的其它变体也误勾选。
+ */
+function syncCustomCheckboxes(config: TemplateConfig) {
+  const checks = effectGrid.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+  const configKeys = new Set(config.effects.map(effectSelectionKey));
+  checks.forEach((cb) => {
+    const idx = parseInt(cb.dataset.effectIdx!);
+    const preset = effectCatalog[idx];
+    cb.checked = configKeys.has(effectSelectionKey(preset));
+  });
+}
+
+/**
+ * 生成 Custom 面板和模板配置之间的稳定匹配 key。
+ *
+ * 这个 key 只用于判断“UI 勾选项是否对应同一个 catalog 预设”。
+ */
+function effectSelectionKey(entry: Pick<TemplateConfig['effects'][number], 'type' | 'config'>): string {
+  if (entry.type === 'organicBlob') {
+    return `${entry.type}:${entry.config?.shape ?? 'blob'}`;
+  }
+  return entry.type;
+}
+
+/**
+ * 提供给复制 URL 功能的当前模板快照。
+ *
+ * 内置模板可以继续用 `t=` 短链接；用户模板、AI 模板、临时 shared 模板
+ * 必须走完整 `code=`，否则对方机器没有对应的 localStorage 模板，或会丢掉
+ * AI 生成的精细 effect.config。Custom 编辑态则直接按当前勾选和运行态生成。
+ */
+function getCurrentTemplateSnapshot(): { isCustom: boolean; config: TemplateConfig } {
+  const val = templateSelect.value;
+  if (isCustomMode || val === 'custom') {
+    return { isCustom: true, config: buildCustomTemplate() };
+  }
+  if (val === 'shared' && sharedUrlTemplate) {
+    return { isCustom: true, config: buildRuntimeTemplateSnapshot(sharedUrlTemplate) };
+  }
+  if (val.startsWith('user-')) {
+    const idx = parseInt(val.split('-')[1]);
+    const config = customTemplates[idx] ?? engine.currentTemplateConfig ?? templates[0];
+    return { isCustom: true, config: buildRuntimeTemplateSnapshot(config) };
+  }
+  const idx = parseInt(val);
+  const config = !isNaN(idx) && idx >= 0 && idx < templates.length
+    ? templates[idx]
+    : engine.currentTemplateConfig ?? templates[0];
+  return { isCustom: false, config: buildRuntimeTemplateSnapshot(config) };
+}
+
 const syncChannel = new BroadcastChannel('pv-tool-sync');
 
 templateSelect.addEventListener('change', () => {
@@ -498,17 +706,29 @@ templateSelect.addEventListener('change', () => {
     isCustomMode = true;
     customPanel.style.display = '';
     engine.loadTemplate(buildCustomTemplate());
+  } else if (val === 'shared' && sharedUrlTemplate) {
+    isCustomMode = false;
+    customPanel.style.display = 'none';
+    engine.loadTemplate(sharedUrlTemplate);
+    syncCustomCheckboxes(sharedUrlTemplate);
+    syncSpeedSlider();
+    syncOpacitySlider();
+    syncPostfxSliders();
   } else if (val.startsWith('user-')) {
     isCustomMode = false;
     customPanel.style.display = 'none';
     const idx = parseInt(val.split('-')[1]);
-    engine.loadTemplate(customTemplates[idx]);
+    const config = customTemplates[idx];
+    engine.loadTemplate(config);
+    syncCustomCheckboxes(config);
     syncSpeedSlider();
     syncPostfxSliders();
   } else {
     isCustomMode = false;
     customPanel.style.display = 'none';
-    engine.loadTemplate(templates[parseInt(val)]);
+    const config = templates[parseInt(val)];
+    engine.loadTemplate(config);
+    syncCustomCheckboxes(config);
     syncSpeedSlider();
     syncOpacitySlider();
     syncPostfxSliders();
@@ -522,16 +742,26 @@ templateSelect.addEventListener('change', () => {
 syncChannel.addEventListener('message', (ev) => {
   const { type, value } = ev.data;
   if (type !== 'template' || value === 'custom') return;
-  if (value.startsWith('user-')) {
+  if (value === 'shared') {
+    if (sharedUrlTemplate) {
+      engine.loadTemplate(sharedUrlTemplate);
+      syncCustomCheckboxes(sharedUrlTemplate);
+      templateSelect.value = value;
+    }
+  } else if (value.startsWith('user-')) {
     const idx = parseInt(value.split('-')[1]);
     if (idx >= 0 && idx < customTemplates.length) {
-      engine.loadTemplate(customTemplates[idx]);
+      const config = customTemplates[idx];
+      engine.loadTemplate(config);
+      syncCustomCheckboxes(config);
       templateSelect.value = value;
     }
   } else {
     const idx = parseInt(value);
     if (!isNaN(idx) && idx >= 0 && idx < templates.length) {
-      engine.loadTemplate(templates[idx]);
+      const config = templates[idx];
+      engine.loadTemplate(config);
+      syncCustomCheckboxes(config);
       templateSelect.value = String(idx);
     }
   }
@@ -543,15 +773,16 @@ syncChannel.addEventListener('message', (ev) => {
   updateTemplateButtons();
 });
 
-// ── Custom template management ──
-let customTemplates = loadCustomTemplates();
-
 function rebuildTemplateSelect() {
-  const builtInHtml = templates.map((tp, i) => `<option value="${i}">${tplName(tp)}</option>`).join('');
+  // 下拉框会展示用户输入/AI 输出/分享码里的模板名，统一转义后再拼 HTML。
+  const builtInHtml = templates.map((tp, i) => `<option value="${i}">${escapeHtml(tplName(tp))}</option>`).join('');
   const customHtml = customTemplates.map((tp, i) =>
-    `<option value="user-${i}">⭐ ${tp.name}</option>`
+    `<option value="user-${i}">⭐ ${escapeHtml(tp.name)}</option>`
   ).join('');
-  templateSelect.innerHTML = builtInHtml + customHtml + `<option value="custom">${t('custom')}</option>`;
+  const sharedHtml = sharedUrlTemplate
+    ? `<option value="shared">↗ ${escapeHtml(sharedUrlTemplate.name)}</option>`
+    : '';
+  templateSelect.innerHTML = builtInHtml + customHtml + sharedHtml + `<option value="custom">${t('custom')}</option>`;
   rebuildTemplateButtons();
 }
 
@@ -599,6 +830,8 @@ tplSaveCancel.addEventListener('click', () => {
 function doSave() {
   const name = tplNameInput.value.trim();
   if (!name) return;
+  // 保存 Custom 时保留当前模板已有 effect.config，同时覆盖运行态 slider 参数。
+  // 这保证“保存后再选择该用户模板”看到的就是保存瞬间的画面。
   const tpl = { ...buildCustomTemplate(), name };
   customTemplates.push(tpl);
   saveCustomTemplates(customTemplates);
@@ -609,6 +842,8 @@ function doSave() {
   engine.loadTemplate(tpl);
   updateTemplateButtons();
   syncSpeedSlider();
+  syncOpacitySlider();
+  syncPostfxSliders();
 }
 
 tplSaveOk.addEventListener('click', doSave);
@@ -649,7 +884,9 @@ tplExportBtn.addEventListener('click', async () => {
   const val = templateSelect.value;
   if (!val.startsWith('user-')) return;
   const idx = parseInt(val.split('-')[1]);
-  const code = await encodeShareCode(customTemplates[idx]);
+  // 导出分享码时也使用运行态快照，避免用户调过速度/透明度/postfx 后导出的
+  // 仍是模板初始值。
+  const code = await encodeShareCode(buildRuntimeTemplateSnapshot(customTemplates[idx]));
   try { await navigator.clipboard.writeText(code); } catch { /* noop */ }
   showToast(t('code_copied'));
 });
@@ -1014,7 +1251,7 @@ const npListenToggle = document.getElementById('np-listen-toggle') as HTMLInputE
 const copyUrlBtn = document.getElementById('copy-url-btn') as HTMLButtonElement | null;
 
 if (copyUrlBtn && npListenToggle) {
-  initCopyUrlButton(copyUrlBtn, templateSelect, npListenToggle);
+  initCopyUrlButton(copyUrlBtn, templateSelect, npListenToggle, getCurrentTemplateSnapshot);
 }
 
 let npConnecting = false;
@@ -1249,3 +1486,94 @@ recBtn.addEventListener('click', () => {
     if (el) hide();
   }, true);
 }
+
+// ── AI Generation Feature Event Binding ──
+(() => {
+  const aiPromptInput = document.getElementById('ai-prompt-input') as HTMLTextAreaElement;
+  const aiGenerateBtn = document.getElementById('ai-generate-btn') as HTMLButtonElement;
+  const aiApiKey = document.getElementById('ai-api-key') as HTMLInputElement;
+  const aiApiUrl = document.getElementById('ai-api-url') as HTMLInputElement;
+  const aiApiModel = document.getElementById('ai-api-model') as HTMLInputElement;
+
+  if (!aiPromptInput || !aiGenerateBtn || !aiApiKey || !aiApiUrl || !aiApiModel) return;
+
+  // Restore configurations from LocalStorage
+  aiApiKey.value = localStorage.getItem('pv-tool-ai-api-key') || '';
+  aiApiUrl.value = localStorage.getItem('pv-tool-ai-api-url') || '';
+  aiApiModel.value = localStorage.getItem('pv-tool-ai-api-model') || '';
+
+  // Listen to inputs and save to LocalStorage
+  aiApiKey.addEventListener('change', () => localStorage.setItem('pv-tool-ai-api-key', aiApiKey.value.trim()));
+  aiApiUrl.addEventListener('change', () => localStorage.setItem('pv-tool-ai-api-url', aiApiUrl.value.trim()));
+  aiApiModel.addEventListener('change', () => localStorage.setItem('pv-tool-ai-api-model', aiApiModel.value.trim()));
+
+  aiGenerateBtn.addEventListener('click', async () => {
+    const prompt = aiPromptInput.value.trim();
+    const apiKey = aiApiKey.value.trim();
+    const apiUrl = aiApiUrl.value.trim();
+    const model = aiApiModel.value.trim();
+
+    if (!apiKey) {
+      showToast(t('ai_key_required'));
+      return;
+    }
+
+    aiGenerateBtn.disabled = true;
+    aiGenerateBtn.textContent = t('ai_generating');
+
+    // Create Mesh Gradient Loader Overlay
+    const loaderOverlay = document.createElement('div');
+    loaderOverlay.className = 'ai-loader-overlay';
+    loaderOverlay.innerHTML = `
+      <div class="ai-loader-dots"></div>
+      <div class="ai-loader-halo-wrapper">
+        <div class="ai-loader-halo"></div>
+        <div class="ai-loader-halo" style="animation-delay: 1.25s;"></div>
+      </div>
+      <div class="ai-loader-content">
+        <div class="ai-loader-text">${t('ai_conceiving')}</div>
+      </div>
+    `;
+    container.appendChild(loaderOverlay);
+
+    try {
+      const config = await generateConfigFromAI(prompt, apiKey, apiUrl, model);
+      
+      // Load generated template configuration into PV Engine
+      engine.loadTemplate(config);
+      
+      // Push config to custom user templates list
+      customTemplates.push(config);
+      saveCustomTemplates(customTemplates);
+      
+      // Rebuild dropdown selection and select the newly created template
+      rebuildTemplateSelect();
+      templateSelect.value = `user-${customTemplates.length - 1}`;
+      isCustomMode = false;
+      customPanel.style.display = 'none';
+
+      // Update control panel action buttons & settings sliders
+      updateTemplateButtons();
+      syncSpeedSlider();
+      syncOpacitySlider();
+      syncPostfxSliders();
+      
+      // Sync effect-grid checklist checkboxes
+      syncCustomCheckboxes(config);
+
+      showToast(t('ai_generate_success'));
+    } catch (err) {
+      console.error('[PV] AI generate config execution failed:', err);
+      showToast(t('ai_generate_error'));
+    } finally {
+      aiGenerateBtn.disabled = false;
+      aiGenerateBtn.textContent = t('ai_generate_btn');
+      
+      // Fade out and remove the loader overlay
+      loaderOverlay.classList.add('ai-loader-fadeout');
+      setTimeout(() => {
+        loaderOverlay.remove();
+      }, 400);
+    }
+  });
+})();

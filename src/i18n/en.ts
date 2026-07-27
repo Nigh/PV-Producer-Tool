@@ -2,17 +2,33 @@ import type { LocaleKey } from './zh';
 
 export const en: Record<LocaleKey, string> = {
   // Page
-  'page_title': 'PV Tool - Japanese PV Visual Generator',
+  'page_title': 'PV Producer Tool - Japanese PV Visual Generator',
+  'brand_title': 'PV Producer Tool',
+
+  // Nav titles + subtitle (EN locale: title only, empty subtitle)
+  'nav_template': 'Template',
+  'nav_template_sub': '',
+  'nav_playback': 'Playback & Media',
+  'nav_playback_sub': '',
+  'nav_shots': 'Shots',
+  'nav_shots_sub': '',
+  'nav_postfx': 'Post FX',
+  'nav_postfx_sub': '',
+  'nav_effects': 'Effects',
+  'nav_effects_sub': '',
+  'nav_ai': 'AI Generator',
+  'nav_ai_sub': '',
+  'nav_export': 'Export',
+  'nav_export_sub': '',
+  'nav_settings': 'Settings',
+  'nav_settings_sub': '',
 
   // Panel titles
   'postfx': 'Post FX',
   'effects_library': 'Effects Library',
-  'nav_playback': 'Playback & Media',
-  'nav_settings': 'Settings',
   'theme_light': 'Light Theme',
 
   // Still-image shots
-  'nav_shots': 'Shots',
   'shots_need_image': 'Load a still image in "Playback & Media" first',
   'shot_hint': 'Drag on the image to frame a shot; drag inside to move, bottom-right corner to resize',
   'shot_in': 'In',
@@ -57,6 +73,8 @@ export const en: Record<LocaleKey, string> = {
   'play': '▶ Play',
   'playing': '♪ Playing',
   'paused': '⏹ Paused',
+  'lyric_prev': 'Previous line',
+  'lyric_next': 'Next line',
   'bpm': 'BPM',
   'beat_react': 'Beat React',
   'preview_fps': 'Limit Preview FPS',
@@ -262,7 +280,7 @@ export const en: Record<LocaleKey, string> = {
   'copy_url_tip': '',
 
   // Footer
-  'footer_desc': 'Japanese PV Visual Generator',
+  'footer_desc': 'PV Producer Tool',
   'footer_contributors': 'Contributors',
 
   // AI Generator Panel

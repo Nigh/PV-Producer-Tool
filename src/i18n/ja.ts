@@ -2,17 +2,33 @@ import type { LocaleKey } from './zh';
 
 export const ja: Record<LocaleKey, string> = {
   // Page
-  'page_title': 'PV Tool - PVビジュアルジェネレーター',
+  'page_title': 'PV Producer Tool - PVビジュアルジェネレーター',
+  'brand_title': 'PV Producer Tool',
+
+  // Nav titles + English subtitle
+  'nav_template': 'テンプレート',
+  'nav_template_sub': 'Template',
+  'nav_playback': '再生と素材',
+  'nav_playback_sub': 'Media',
+  'nav_shots': 'カット割り',
+  'nav_shots_sub': 'Shots',
+  'nav_postfx': 'ポスト',
+  'nav_postfx_sub': 'Post FX',
+  'nav_effects': 'エフェクト',
+  'nav_effects_sub': 'Effects',
+  'nav_ai': 'AI ジェネレーター',
+  'nav_ai_sub': 'AI Gen',
+  'nav_export': '書き出し',
+  'nav_export_sub': 'Export',
+  'nav_settings': '設定',
+  'nav_settings_sub': 'Settings',
 
   // Panel titles
-  'postfx': 'ポスト Post FX',
-  'effects_library': 'エフェクト Effects',
-  'nav_playback': '再生と素材 Media',
-  'nav_settings': '設定 Settings',
-  'theme_light': 'ライトテーマ Light',
+  'postfx': 'ポスト',
+  'effects_library': 'エフェクト',
+  'theme_light': 'ライトテーマ',
 
   // 静止画カット割り
-  'nav_shots': 'カット割り Shots',
   'shots_need_image': '先に「再生と素材」で静止画を読み込んでください',
   'shot_hint': '画像上をドラッグして切り取り範囲を指定。枠内ドラッグで移動、右下で拡縮',
   'shot_in': 'イン In',
@@ -33,7 +49,7 @@ export const ja: Record<LocaleKey, string> = {
   'mo_panDown': '下パン',
 
   // Left panel
-  'template': 'テンプレート Template',
+  'template': 'テンプレート',
   'custom': '✦ カスタム Custom',
   'canvas_color': 'キャンバス色 Canvas',
   'follow_template': 'テンプレに従う',
@@ -57,6 +73,8 @@ export const ja: Record<LocaleKey, string> = {
   'play': '▶ 再生',
   'playing': '♪ 再生中',
   'paused': '⏹ 停止中',
+  'lyric_prev': '前の行',
+  'lyric_next': '次の行',
   'bpm': 'BPM',
   'beat_react': 'ビート反応 Beat React',
   'preview_fps': 'プレビューFPS制限',
@@ -82,7 +100,7 @@ export const ja: Record<LocaleKey, string> = {
   'timer_label': 'タイマー Time',
 
   // Right panel — Export
-  'export': '書き出し Export',
+  'export': '書き出し',
   'copy_url': 'URL をコピー',
 
   // Right panel — Listen
@@ -263,7 +281,7 @@ export const ja: Record<LocaleKey, string> = {
   'copy_url_tip': '',
 
   // Footer
-  'footer_desc': 'PVビジュアルジェネレーター',
+  'footer_desc': 'PV Producer Tool',
   'footer_contributors': 'コントリビューター',
 
   // AI Generator Panel

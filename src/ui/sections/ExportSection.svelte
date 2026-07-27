@@ -12,7 +12,7 @@
     <input type="checkbox" class="checkbox checkbox-xs" bind:checked={ui.alphaMode}
       onchange={() => { engine.alphaMode = ui.alphaMode; }} />
     <span>{t('alpha_export')}</span>
-    <span class="help-tip tooltip tooltip-right" data-tip={t('alpha_tip')}>?</span>
+    <span class="help-tip tooltip tooltip-top" data-tip={t('alpha_tip')}>?</span>
   </label>
 </div>
 
@@ -29,6 +29,6 @@
 {#if locale === 'zh'}
   <div class="control-group copy-url-row">
     <button class="btn btn-sm flex-1" title={t('copy_url')} onclick={openCopyUrlModal}>{t('copy_url')}</button>
-    <span class="help-tip tooltip tooltip-right" data-tip={t('copy_url_tip')}>?</span>
+    <span class="help-tip tooltip tooltip-top" data-tip={t('copy_url_tip')}>?</span>
   </div>
 {/if}

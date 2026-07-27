@@ -14,15 +14,17 @@
   import ExportSection from './sections/ExportSection.svelte';
   import SettingsSection from './sections/SettingsSection.svelte';
 
+  const REPO_URL = 'https://github.com/Nigh/PV-Producer-Tool';
+
   const SECTIONS = [
-    { id: 'template', label: t('template'), component: TemplateSection },
-    { id: 'playback', label: t('nav_playback'), component: PlaybackSection },
-    { id: 'shots', label: t('nav_shots'), component: ShotsSection },
-    { id: 'postfx', label: t('postfx'), component: PostFxSection },
-    { id: 'effects', label: t('effects_library'), component: EffectsSection },
-    { id: 'ai', label: t('ai_panel'), component: AiSection },
-    { id: 'export', label: t('export'), component: ExportSection },
-    { id: 'settings', label: t('nav_settings'), component: SettingsSection },
+    { id: 'template', title: t('nav_template'), sub: t('nav_template_sub'), component: TemplateSection },
+    { id: 'playback', title: t('nav_playback'), sub: t('nav_playback_sub'), component: PlaybackSection },
+    { id: 'shots', title: t('nav_shots'), sub: t('nav_shots_sub'), component: ShotsSection },
+    { id: 'postfx', title: t('nav_postfx'), sub: t('nav_postfx_sub'), component: PostFxSection },
+    { id: 'effects', title: t('nav_effects'), sub: t('nav_effects_sub'), component: EffectsSection },
+    { id: 'ai', title: t('nav_ai'), sub: t('nav_ai_sub'), component: AiSection },
+    { id: 'export', title: t('nav_export'), sub: t('nav_export_sub'), component: ExportSection },
+    { id: 'settings', title: t('nav_settings'), sub: t('nav_settings_sub'), component: SettingsSection },
   ] as const;
 
   let container: HTMLDivElement;
@@ -59,28 +61,51 @@
 <div class="app-shell">
   <aside class="sidebar" class:sidebar-closed={!sidebarOpen}>
     <div class="sidebar-header">
-      <span class="sidebar-brand">PV Tool</span>
+      <span class="sidebar-brand">{t('brand_title')}</span>
     </div>
     <div class="sidebar-body">
       <nav class="nav-rail">
-        <ul class="menu menu-xs w-full p-0 gap-1">
+        <ul class="menu menu-sm w-full p-0 gap-1">
           {#each SECTIONS as section (section.id)}
             <li>
               <button
+                class="nav-item"
                 class:menu-active={active === section.id}
                 onclick={() => { active = section.id; }}
-              >{section.label}</button>
+              >
+                <span class="nav-item-title">{section.title}</span>
+                {#if section.sub}
+                  <span class="nav-item-sub">{section.sub}</span>
+                {/if}
+              </button>
             </li>
           {/each}
         </ul>
       </nav>
       <div class="nav-content">
-        <div class="panel-title">{activeSection.label}</div>
+        <div class="panel-title">{activeSection.title}</div>
         <activeSection.component />
       </div>
     </div>
-    <div class="hide-hint">{t('hint_press')} <kbd class="kbd kbd-xs">H</kbd> {t('hint_hide_panels')}</div>
+    <div class="sidebar-footer">
+      <button
+        class="sidebar-collapse"
+        title={t('collapse')}
+        aria-label={t('collapse')}
+        onclick={() => { sidebarOpen = false; }}
+      >‹</button>
+      <div class="hide-hint">{t('hint_press')} <kbd class="kbd kbd-xs">H</kbd> {t('hint_hide_panels')}</div>
+    </div>
   </aside>
+
+  {#if !sidebarOpen}
+    <button
+      class="sidebar-expand"
+      title={t('expand')}
+      aria-label={t('expand')}
+      onclick={() => { sidebarOpen = true; }}
+    >›</button>
+  {/if}
 
   <main class="stage">
     <div id="pv-container" bind:this={container}>
@@ -101,13 +126,9 @@
     <footer class="pv-footer">
       <span class="pv-footer-desc">{t('footer_desc')}</span>
       <span class="pv-footer-sep">·</span>
-      <a href="https://github.com/DanteAlighieri13210914/pv-tool" target="_blank" rel="noopener" class="pv-footer-link">GitHub</a>
+      <a href={REPO_URL} target="_blank" rel="noopener" class="pv-footer-link">GitHub</a>
       <span class="pv-footer-sep">·</span>
-      <a href="{import.meta.env.BASE_URL}contributors.html" target="_blank" class="pv-footer-link">{t('footer_contributors')}</a>
+      <a href="{REPO_URL}/graphs/contributors" target="_blank" rel="noopener" class="pv-footer-link">{t('footer_contributors')}</a>
     </footer>
   </main>
 </div>
-
-<button class="sidebar-toggle" onclick={() => { sidebarOpen = !sidebarOpen; }}>
-  {sidebarOpen ? '✕' : '☰'}
-</button>

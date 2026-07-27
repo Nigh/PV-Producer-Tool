@@ -139,7 +139,7 @@
     <label class="effect-toggle">
       <input type="checkbox" class="checkbox checkbox-xs" checked={ui.npListening} onchange={onNpToggle} />
       <span>{t('listen_now_playing')}</span>
-      <span class="help-tip tooltip tooltip-right" data-tip={t('listen_np_tip')}>?</span>
+      <span class="help-tip tooltip tooltip-top" data-tip={t('listen_np_tip')}>?</span>
     </label>
   </div>
 {/if}

@@ -39,13 +39,13 @@ body {
 .sidebar {
   display: flex;
   flex-direction: column;
-  width: 360px;
+  width: 640px;
   flex-shrink: 0;
   height: 100%;
   background: var(--color-base-200);
   color: var(--color-base-content);
   border-right: 1px solid color-mix(in oklab, var(--color-base-content) 10%, transparent);
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   z-index: 100;
 }
 
@@ -61,9 +61,10 @@ body {
 
 .sidebar-brand {
   font-weight: bold;
-  letter-spacing: 2px;
-  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+  font-size: 1.2rem;
   color: var(--color-primary);
+  line-height: 1.25;
 }
 
 .sidebar-body {
@@ -74,28 +75,102 @@ body {
 }
 
 .nav-rail {
-  width: 104px;
+  width: 128px;
   flex-shrink: 0;
   padding: 8px 6px;
   overflow-y: auto;
   border-right: 1px solid color-mix(in oklab, var(--color-base-content) 8%, transparent);
 }
 
-.nav-rail .menu button {
-  font-size: 0.7rem;
-  line-height: 1.3;
+.nav-rail .menu .nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 8px;
+  line-height: 1.25;
   text-align: left;
-  word-break: keep-all;
+  white-space: normal;
+}
+
+.nav-item-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.nav-item-sub {
+  font-size: 0.72rem;
+  font-weight: 400;
+  opacity: 0.55;
+  letter-spacing: 0.02em;
 }
 
 .nav-content {
   flex: 1;
   min-width: 0;
-  padding: 12px 14px;
+  padding: 12px 16px;
+  overflow-x: hidden;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  font-size: 0.95rem;
+}
+
+/* 侧栏内容区：防止子项撑出横向滚动条；按钮边框可见 */
+.nav-content > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.nav-content .btn {
+  border-width: 1px;
+  border-style: solid;
+  border-color: color-mix(in oklab, var(--color-base-content) 35%, transparent);
+}
+
+.nav-content .btn:hover {
+  border-color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+}
+
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid color-mix(in oklab, var(--color-base-content) 8%, transparent);
+}
+
+.sidebar-collapse,
+.sidebar-expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid color-mix(in oklab, var(--color-base-content) 25%, transparent);
+  background: color-mix(in oklab, var(--color-base-300) 80%, transparent);
+  color: var(--color-base-content);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sidebar-collapse:hover,
+.sidebar-expand:hover {
+  background: color-mix(in oklab, var(--color-base-content) 12%, transparent);
+}
+
+.sidebar-expand {
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  z-index: 200;
+  background: color-mix(in oklab, var(--color-base-200) 85%, transparent);
+  backdrop-filter: blur(8px);
 }
 
 .stage {
@@ -103,26 +178,6 @@ body {
   min-width: 0;
   position: relative;
   height: 100%;
-}
-
-.sidebar-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: fixed;
-  top: 10px;
-  right: 10px;
-  z-index: 200;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  border: 1px solid color-mix(in oklab, var(--color-base-content) 25%, transparent);
-  background: color-mix(in oklab, var(--color-base-200) 75%, transparent);
-  backdrop-filter: blur(8px);
-  color: var(--color-base-content);
-  font-size: 1.2rem;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
 }
 
 .collapsible-section {
@@ -152,7 +207,7 @@ body {
 }
 
 .panel-title {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   font-weight: bold;
   color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
   text-transform: uppercase;
@@ -166,6 +221,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .control-group > label,
@@ -173,7 +230,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: bold;
   color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
   text-transform: uppercase;
@@ -182,7 +239,7 @@ body {
 
 textarea.textarea {
   resize: none;
-  min-height: 30px;
+  min-height: 4.2em;
   line-height: 1.4;
 }
 
@@ -234,6 +291,24 @@ textarea.textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.timeline-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.timeline-controls .btn {
+  min-width: 2.75rem;
+  min-height: 2.5rem;
+  font-size: 1.25rem;
+  line-height: 1;
+  border-width: 1px;
+  border-style: solid;
+  border-color: color-mix(in oklab, var(--color-base-content) 40%, transparent);
 }
 
 .template-actions {
@@ -312,11 +387,13 @@ textarea.textarea {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
   cursor: pointer;
   padding: 3px 0;
   transition: color 0.15s;
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .effect-toggle:hover {
@@ -443,7 +520,7 @@ textarea.textarea {
 .color-swatches {
   display: flex;
   gap: 4px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .swatch {
@@ -527,7 +604,7 @@ textarea.textarea {
     top: 0;
     left: 0;
     bottom: 0;
-    width: min(85vw, 360px);
+    width: min(92vw, 640px);
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
   }
 
@@ -622,7 +699,9 @@ textarea.textarea {
   font-size: 11px;
   opacity: 0.4;
   user-select: none;
-  text-align: center;
+  text-align: left;
+  flex: 1;
+  min-width: 0;
 }
 
 .help-tip {
@@ -643,7 +722,7 @@ textarea.textarea {
 }
 
 body.pv-panels-hidden .sidebar,
-body.pv-panels-hidden .sidebar-toggle,
+body.pv-panels-hidden .sidebar-expand,
 body.pv-panels-hidden .pv-footer {
   display: none;
 }

@@ -112,11 +112,29 @@
 </script>
 
 <div class="control-group">
+  <label for="seek-slider">{t('timer_label')} <span class="opacity-70">{formatClock(ui.playbackTime)} / {formatClock(ui.timelineDuration)}</span></label>
+  <input
+    id="seek-slider"
+    type="range" class="range range-xs range-primary w-full"
+    min="0" max="1" step="0.001"
+    bind:value={seekValue}
+    oninput={onSeek}
+    onpointerdown={() => { isSeeking = true; }}
+    onpointerup={() => { isSeeking = false; }}
+  />
+  <div class="timeline-controls">
+    <button class="btn btn-sm" title={t('lyric_prev')} aria-label={t('lyric_prev')} onclick={() => engine.seekPrevSegment()}>⏮</button>
+    <button class="btn btn-sm" title={ui.paused ? t('play') : t('pause')} aria-label={ui.paused ? t('play') : t('pause')} onclick={togglePause}>{ui.paused ? '▶' : '⏸'}</button>
+    <button class="btn btn-sm" title={t('lyric_next')} aria-label={t('lyric_next')} onclick={() => engine.seekNextSegment()}>⏭</button>
+  </div>
+</div>
+
+<div class="control-group">
   <label for="text-input">{t('text_label')}</label>
   <textarea
     id="text-input"
     class="textarea textarea-sm w-full"
-    rows={textExpanded ? 6 : 1}
+    rows={textExpanded ? 6 : 3}
     placeholder="深夜東京/の6畳半夢"
     bind:value={ui.text}
     oninput={onTextInput}
@@ -151,22 +169,6 @@
     </div>
   </div>
 {/if}
-
-<div class="control-group">
-  <div class="timeline-header">
-    <label for="seek-slider">{t('timer_label')} <span class="opacity-70">{formatClock(ui.playbackTime)} / {formatClock(ui.timelineDuration)}</span></label>
-    <button class="btn btn-xs" onclick={togglePause}>{ui.paused ? '▶' : '⏸'}</button>
-  </div>
-  <input
-    id="seek-slider"
-    type="range" class="range range-xs range-primary w-full"
-    min="0" max="1" step="0.001"
-    bind:value={seekValue}
-    oninput={onSeek}
-    onpointerdown={() => { isSeeking = true; }}
-    onpointerup={() => { isSeeking = false; }}
-  />
-</div>
 
 <div class="control-group">
   <label for="media-pick-btn">{t('media')}</label>

@@ -7,6 +7,9 @@ export const ja: Record<LocaleKey, string> = {
   // Panel titles
   'postfx': 'ポスト Post FX',
   'effects_library': 'エフェクト Effects',
+  'nav_playback': '再生と素材 Media',
+  'nav_settings': '設定 Settings',
+  'theme_light': 'ライトテーマ Light',
 
   // Left panel
   'template': 'テンプレート Template',

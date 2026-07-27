@@ -27,43 +27,102 @@ body {
   position: relative;
 }
 
-/* ─── Control panels (floating over canvas) ─── */
+/* ─── Sidebar layout ─── */
 
-.controls {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 100;
-  background: color-mix(in oklab, var(--color-base-200) 82%, transparent);
-  color: var(--color-base-content);
-  padding: 16px;
-  border-radius: var(--radius-box, 10px);
+.app-shell {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  backdrop-filter: blur(10px);
-  min-width: 220px;
-  max-width: 300px;
-  max-height: calc(100vh - 32px);
-  overflow-y: auto;
-  border: 1px solid color-mix(in oklab, var(--color-base-content) 10%, transparent);
+  width: 360px;
+  flex-shrink: 0;
+  height: 100%;
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+  border-right: 1px solid color-mix(in oklab, var(--color-base-content) 10%, transparent);
   font-size: 0.85rem;
+  z-index: 100;
 }
 
-.controls-right {
-  left: auto;
-  right: 16px;
+.sidebar-closed {
+  display: none;
 }
 
-.controls-bottom {
-  left: 50%;
-  transform: translateX(-50%);
-  top: auto;
-  bottom: 16px;
-  min-width: 700px;
-  max-width: 90vw;
-  max-height: 40vh;
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px 8px;
+}
+
+.sidebar-brand {
+  font-weight: bold;
+  letter-spacing: 2px;
+  font-size: 0.9rem;
+  color: var(--color-primary);
+}
+
+.sidebar-body {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+}
+
+.nav-rail {
+  width: 104px;
+  flex-shrink: 0;
+  padding: 8px 6px;
   overflow-y: auto;
+  border-right: 1px solid color-mix(in oklab, var(--color-base-content) 8%, transparent);
+}
+
+.nav-rail .menu button {
+  font-size: 0.7rem;
+  line-height: 1.3;
+  text-align: left;
+  word-break: keep-all;
+}
+
+.nav-content {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stage {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  height: 100%;
+}
+
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 200;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in oklab, var(--color-base-content) 25%, transparent);
+  background: color-mix(in oklab, var(--color-base-200) 75%, transparent);
+  backdrop-filter: blur(8px);
+  color: var(--color-base-content);
+  font-size: 1.2rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .collapsible-section {
@@ -341,98 +400,20 @@ textarea.textarea {
   min-width: 40px;
 }
 
-/* ─── Panels wrapper / mobile ─── */
-
-.panels-wrapper {
-  display: contents;
-}
-
-.mobile-toggle {
-  display: none;
-}
+/* ─── Mobile: sidebar becomes overlay drawer ─── */
 
 @media (max-width: 768px) {
   #pv-container {
     touch-action: none;
   }
 
-  .mobile-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 200;
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    border: 1px solid color-mix(in oklab, var(--color-base-content) 25%, transparent);
-    background: color-mix(in oklab, var(--color-base-200) 75%, transparent);
-    backdrop-filter: blur(8px);
-    color: var(--color-base-content);
-    font-size: 1.2rem;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .panels-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+  .sidebar {
     position: fixed;
-    bottom: 0;
+    top: 0;
     left: 0;
-    right: 0;
-    z-index: 100;
-    max-height: 55vh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    transition: transform 0.25s ease;
-  }
-
-  .panels-wrapper.panels-hidden {
-    transform: translateY(100%);
-    pointer-events: none;
-  }
-
-  .controls,
-  .controls-right {
-    position: relative;
-    top: auto;
-    left: auto;
-    right: auto;
-    bottom: auto;
-    border-radius: 0;
-    min-width: unset;
-    width: 100%;
-    max-height: none;
-    overflow-y: visible;
-    padding: 14px 16px;
-    gap: 10px;
-  }
-
-  .panels-wrapper > .controls:first-child {
-    border-radius: 12px 12px 0 0;
-  }
-
-  .controls-bottom {
-    position: relative;
-    top: auto;
-    left: auto;
-    bottom: auto;
-    transform: none;
-    min-width: unset;
-    max-width: unset;
-    width: 100%;
-    border-radius: 0;
-    max-height: none;
-    overflow-y: visible;
-  }
-
-  .effect-grid {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 4px 10px;
+    bottom: 0;
+    width: min(85vw, 360px);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
   }
 
   .effect-toggle {
@@ -546,8 +527,8 @@ textarea.textarea {
   flex-shrink: 0;
 }
 
-body.pv-panels-hidden .panels-wrapper,
-body.pv-panels-hidden .mobile-toggle,
+body.pv-panels-hidden .sidebar,
+body.pv-panels-hidden .sidebar-toggle,
 body.pv-panels-hidden .pv-footer {
   display: none;
 }

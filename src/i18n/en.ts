@@ -7,6 +7,9 @@ export const en: Record<LocaleKey, string> = {
   // Panel titles
   'postfx': 'Post FX',
   'effects_library': 'Effects Library',
+  'nav_playback': 'Playback & Media',
+  'nav_settings': 'Settings',
+  'theme_light': 'Light Theme',
 
   // Left panel
   'template': 'Template',

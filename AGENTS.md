@@ -18,8 +18,9 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 - `src/main.ts` — slim entry: mounts the Svelte `App` (UI lives in `src/ui/`).
 - `src/ui/` — Svelte UI layer:
   - `store.svelte.ts` — runes state (`ui`), the `PVEngine` instance, and all template-management actions (select/save/delete/share-code/AI-generate/URL-param init). The single source of truth for UI↔engine sync.
-  - `App.svelte` — layout shell, engine mount, H-key panel toggle, AI loader overlay, footer.
-  - `LeftPanel.svelte` / `RightPanel.svelte` / `EffectsPanel.svelte` — control panels (template & playback / post-FX & export & AI / custom effects grid).
+  - `App.svelte` — left-sidebar navigation shell (nav rail + active section), engine mount, H-key hide-all, AI loader overlay, footer. Mobile: sidebar becomes an overlay drawer.
+  - `sections/` — one component per nav section: Template, Playback (text/media/audio/timeline), PostFx, Effects (grid; toggling while a preset is active auto-switches to Custom), Ai, Export, Settings (canvas color/font/FPS/theme/NP-listen).
+  - `theme.svelte.ts` — xianii / xianii-light theme switch persisted in localStorage.
   - `recorder.svelte.ts` — MediaRecorder + PNG-sequence (alpha) export. `copyUrl.ts` — copy-URL modal.
   - `Slider.svelte` — labeled range control.
 - `src/app.css` — Tailwind + design-system import + residual global styles (panel layout, toast/modal, AI loader).

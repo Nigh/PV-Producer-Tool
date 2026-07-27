@@ -77,6 +77,10 @@ export class PVEngine {
   private _paused = false;
   private _time = 0;
   private _lastFrameTime = 0;
+  private _fpsFrames = 0;
+  private _fpsWindowStart = 0;
+  /** Called about once per second with the measured render FPS. */
+  onFpsUpdate: ((fps: number) => void) | null = null;
 
   // Now Playing state
   private npProvider: NowPlayingProvider | null = null;
@@ -138,6 +142,14 @@ export class PVEngine {
       const dt = (now - this._lastFrameTime) / 1000;
       this._lastFrameTime = now;
 
+      // Measured FPS, reported once per second for the UI readout.
+      this._fpsFrames++;
+      if (now - this._fpsWindowStart >= 1000) {
+        this.onFpsUpdate?.(Math.round((this._fpsFrames * 1000) / (now - this._fpsWindowStart)));
+        this._fpsFrames = 0;
+        this._fpsWindowStart = now;
+      }
+
       if (!this._paused) {
         if (this._npActive) {
           // In Now Playing mode, advance time locally when not paused
@@ -152,12 +164,11 @@ export class PVEngine {
         }
       }
 
-      // ticker.deltaTime is normalised to "1 = 1 frame at maxFPS"; divide
-      // by maxFPS to convert to real seconds. Reading maxFPS dynamically
-      // (instead of hardcoding 60) keeps the conversion correct if the
-      // ticker target is ever retuned.
-      const targetFps = this.app.ticker.maxFPS || 60;
-      this.update(this._time, this._paused ? 0 : ticker.deltaTime / targetFps);
+      // ticker.deltaMS is real elapsed milliseconds. Do NOT derive seconds
+      // from ticker.deltaTime / maxFPS: Pixi normalises deltaTime against a
+      // fixed 60fps target (Ticker.targetFPMS), so that conversion is only
+      // correct at 60fps and breaks once previewFps throttles the ticker.
+      this.update(this._time, this._paused ? 0 : ticker.deltaMS / 1000);
     });
   }
 
@@ -579,6 +590,10 @@ export class PVEngine {
   set beatReactivity(val: number) { this._beatReactivity = val; }
   get beatReactivity() { return this._beatReactivity; }
 
+  /** Preview frame-rate cap; 0 means unlimited (display refresh rate). */
+  set previewFps(fps: number) { this.app.ticker.maxFPS = fps > 0 ? fps : 0; }
+  get previewFps() { return this.app.ticker.maxFPS; }
+
   set canvasColor(color: string | null) {
     this._bgColorOverride = color;
     if (color) {
@@ -912,7 +927,9 @@ export class PVEngine {
     const ctx: UpdateContext = {
       time,
       deltaTime,
-      fps: this.app.ticker.maxFPS,
+      // maxFPS is 0 when unthrottled; fall back to 60 so effects that
+      // convert frame counts to seconds (e.g. filmGrain) never divide by 0.
+      fps: this.app.ticker.maxFPS || 60,
       screenWidth: this.app.screen.width,
       screenHeight: this.app.screen.height,
       palette: this.palette,

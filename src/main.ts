@@ -197,6 +197,14 @@ app.innerHTML = `
         <label>${t('beat_react')} <span id="beat-val">0.5</span></label>
         <input type="range" id="beat-slider" min="0" max="1" step="0.05" value="0.5">
       </div>
+
+      <div class="control-group">
+        <label>${t('preview_fps')} <span id="fps-actual"></span></label>
+        <select id="fps-select">
+          <option value="0">${t('fps_unlimited')}</option>
+          ${[24, 30, 60, 120].map((v) => `<option value="${v}">${v} fps</option>`).join('')}
+        </select>
+      </div>
       </details>
 
       <div class="hide-hint" id="hide-hint">${t('hint_press')} <kbd>H</kbd> ${t('hint_hide_panels')}</div>
@@ -1170,6 +1178,16 @@ beatSlider.addEventListener('input', () => {
   engine.beatReactivity = v;
   beatVal.textContent = v.toFixed(2);
 });
+
+// Preview FPS limit
+const fpsSelect = document.getElementById('fps-select') as HTMLSelectElement;
+const fpsActual = document.getElementById('fps-actual')!;
+fpsSelect.addEventListener('change', () => {
+  engine.previewFps = parseInt(fpsSelect.value);
+});
+engine.onFpsUpdate = (fps) => {
+  fpsActual.textContent = `(${fps} fps)`;
+};
 
 // Media upload
 const mediaInput = document.getElementById('media-input') as HTMLInputElement;

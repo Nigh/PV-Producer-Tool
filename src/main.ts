@@ -112,6 +112,16 @@ app.innerHTML = `
         </div>
       </div>
 
+      <div class="control-group" id="font-group" style="display:none">
+        <label>${t('font_label')}</label>
+        <div class="font-pick-row">
+          <select id="font-select">
+            <option value="">${t('follow_template')}</option>
+          </select>
+          <button class="btn btn-sm" id="font-load-btn" title="${t('load_local_fonts')}">あ/A</button>
+        </div>
+      </div>
+
       <div class="control-group">
         <label>${t('text_label')}</label>
         <textarea id="text-input" rows="1" placeholder="深夜東京/の6畳半夢">深夜東京/の6畳半夢/を見てた/灯りの灯らない蛍光灯/明日には消えてる電脳城/に/開幕戦/打ち上げて/いなくなんないよね/ここには誰もいない/ここには誰もいないから</textarea>
@@ -507,6 +517,47 @@ swatchContainer.addEventListener('click', (e) => {
   const color = btn.dataset.color;
   engine.canvasColor = color || null;
 });
+
+// Custom font (Local Font Access API, Chromium desktop only)
+const fontGroup = document.getElementById('font-group')!;
+const fontSelect = document.getElementById('font-select') as HTMLSelectElement;
+const fontLoadBtn = document.getElementById('font-load-btn') as HTMLButtonElement;
+
+fontSelect.addEventListener('change', () => {
+  // Quote the family so names with spaces form a valid CSS font stack.
+  engine.fontFamily = fontSelect.value ? `"${fontSelect.value}"` : null;
+});
+
+async function loadLocalFonts(): Promise<void> {
+  // queryLocalFonts returns one entry per style variant; collapse to families.
+  const fonts: { family: string }[] = await (window as any).queryLocalFonts();
+  const families = [...new Set(fonts.map((f) => f.family).filter(Boolean))].sort();
+  if (!families.length) return;
+
+  const current = fontSelect.value;
+  fontSelect.options.length = 1;
+  for (const family of families) {
+    // new Option() sets text via the DOM, so font names can't inject HTML.
+    fontSelect.add(new Option(family, family));
+  }
+  fontSelect.value = current && families.includes(current) ? current : '';
+  fontLoadBtn.style.display = 'none';
+}
+
+if ('queryLocalFonts' in window) {
+  fontGroup.style.display = '';
+  fontLoadBtn.addEventListener('click', () => {
+    loadLocalFonts().catch((err) => {
+      console.warn('[PV] Local font access denied or failed:', err);
+      showToast(t('load_fonts_failed'));
+    });
+  });
+  // Silent auto-load only when permission was already granted earlier;
+  // first-time access requires the button click (user activation).
+  (navigator.permissions?.query({ name: 'local-fonts' as PermissionName }) ?? Promise.reject())
+    .then((st) => { if (st.state === 'granted') return loadLocalFonts(); })
+    .catch(() => { /* permission API unsupported: wait for button click */ });
+}
 
 // Template
 const templateSelect = document.getElementById('template-select') as HTMLSelectElement;

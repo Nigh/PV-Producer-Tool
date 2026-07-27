@@ -18,6 +18,9 @@ reference/
 # Documentation build artifacts (local only)
 docs/
 
+# graphify knowledge graph (generated, local only)
+graphify-out/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

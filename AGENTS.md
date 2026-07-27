@@ -7,15 +7,23 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 ## 2) Tech Stack & Commands
 
 - **Runtime**: PixiJS 8 (WebGL/WebGPU), GSAP, JSZip; Canvas 2D for texture generation, color extraction, motion detection.
-- **Build**: Vite 7 + TypeScript 5.9 (`strict`, `verbatimModuleSyntax`, `noEmit` — tsc is type-check only). ES modules, target ES2022.
-- **Commands**: `npm run dev` (Vite dev server, full-reload on `src/**`), `npm run build` (`tsc && vite build`), `npm run preview`.
-- No test framework, no linter config beyond tsc. `npm run build` is the only CI-grade check.
+- **UI**: Svelte 5 (runes) + Tailwind CSS v4 + daisyUI v5, themed by `@xianii/design-system` (imported in `src/app.css`).
+- **Build**: Vite 7 (`@sveltejs/vite-plugin-svelte` v6, `@tailwindcss/vite`) + TypeScript 5.9 (`strict`, `verbatimModuleSyntax`, `noEmit`). Type checking via `svelte-check` (covers .ts and .svelte).
+- **Commands**: `npm run dev` (Vite dev + HMR), `npm run check` (svelte-check), `npm run build` (`svelte-check && vite build`), `npm run preview`.
+- No test framework. `npm run build` is the only CI-grade check.
 - Vite `base` is `/pv-tool/` (override with `VITE_BASE` env var). Deployed to GitHub Pages via `.github/workflows/deploy.yml` on push to `main`. Working branch is `dev`.
 
 ## 3) Repo Layout
 
-- `src/main.ts` — single large entry point (~60KB): all DOM/UI wiring, control panel, media/audio loading, save/export.
-- `src/core/` — engine and services:
+- `src/main.ts` — slim entry: mounts the Svelte `App` (UI lives in `src/ui/`).
+- `src/ui/` — Svelte UI layer:
+  - `store.svelte.ts` — runes state (`ui`), the `PVEngine` instance, and all template-management actions (select/save/delete/share-code/AI-generate/URL-param init). The single source of truth for UI↔engine sync.
+  - `App.svelte` — layout shell, engine mount, H-key panel toggle, AI loader overlay, footer.
+  - `LeftPanel.svelte` / `RightPanel.svelte` / `EffectsPanel.svelte` — control panels (template & playback / post-FX & export & AI / custom effects grid).
+  - `recorder.svelte.ts` — MediaRecorder + PNG-sequence (alpha) export. `copyUrl.ts` — copy-URL modal.
+  - `Slider.svelte` — labeled range control.
+- `src/app.css` — Tailwind + design-system import + residual global styles (panel layout, toast/modal, AI loader).
+- `src/core/` — engine and services (framework-free):
   - `engine.ts` — `PVEngine`: PixiJS app, layer stack, effect lifecycle, post-FX (shake/zoom/glitch/chromatic aberration), HiDPI with auto-downscale when many heavy effects are active.
   - `types.ts` — `TemplateConfig`, `ColorPalette`, `UpdateContext`, `resolveColor()`.
   - `effectCatalog.ts` — UI-facing catalog of all effects (labels, default configs, categories).
@@ -25,7 +33,7 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 - `src/effects/` — one file per effect (~100 files). All extend `BaseEffect` (`base.ts`): `init() → setup()`, `update(ctx)`, `destroy()`; set `heavy = true` for GPU/CPU-costly effects so the engine can frame-skip. Effects are registered by string id in `src/effects/index.ts` (`register()` / `createEffect()`).
 - `src/templates/` — preset `TemplateConfig`s (effect id + config lists), aggregated in `src/templates/index.ts`.
 - `src/i18n/` — `zh.ts` (source of truth for `LocaleKey`), `en.ts`, `ja.ts`, `t()` helper. New UI strings need all three locales.
-- `public/` — static assets; `index.html` + `src/style.css` — the entire UI shell.
+- `public/` — static assets; `index.html` is just the mount point.
 
 ## 4) Conventions
 
@@ -36,7 +44,7 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 
 ## 5) Known Facts / Gotchas
 
-- `main.ts` is intentionally monolithic; prefer small additions over refactoring it unless asked.
+- `src/core/` must stay framework-free (no Svelte imports); UI state belongs in `src/ui/store.svelte.ts`.
 - `tsconfig` has `noUnusedLocals`/`noUnusedParameters` — dead code fails the build.
 - Effects must clean up in `destroy()`; `BaseEffect.destroy()` handles the container tree, but external resources (video elements, intervals, canvases) are the effect's responsibility.
 - No environment secrets exist in the repo; the only key (AI API key) is user-provided in the browser.

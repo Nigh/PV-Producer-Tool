@@ -11,6 +11,27 @@ export const en: Record<LocaleKey, string> = {
   'nav_settings': 'Settings',
   'theme_light': 'Light Theme',
 
+  // Still-image shots
+  'nav_shots': 'Shots',
+  'shots_need_image': 'Load a still image in "Playback & Media" first',
+  'shot_hint': 'Drag on the image to frame a shot; drag inside to move, bottom-right corner to resize',
+  'shot_in': 'In',
+  'shot_out': 'Out',
+  'shot_motion': 'Motion',
+  'shot_clear': 'Clear',
+  'shot_preview': 'Preview',
+  'tr_cut': 'Cut',
+  'tr_fade': 'Fade',
+  'tr_slide': 'Slide',
+  'tr_zoom': 'Zoom',
+  'mo_none': 'Static',
+  'mo_zoomIn': 'Zoom In',
+  'mo_zoomOut': 'Zoom Out',
+  'mo_panLeft': 'Pan Left',
+  'mo_panRight': 'Pan Right',
+  'mo_panUp': 'Pan Up',
+  'mo_panDown': 'Pan Down',
+
   // Left panel
   'template': 'Template',
   'custom': '✦ Custom',

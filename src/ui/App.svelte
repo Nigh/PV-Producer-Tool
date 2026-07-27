@@ -8,6 +8,7 @@
   import TemplateSection from './sections/TemplateSection.svelte';
   import PlaybackSection from './sections/PlaybackSection.svelte';
   import PostFxSection from './sections/PostFxSection.svelte';
+  import ShotsSection from './sections/ShotsSection.svelte';
   import EffectsSection from './sections/EffectsSection.svelte';
   import AiSection from './sections/AiSection.svelte';
   import ExportSection from './sections/ExportSection.svelte';
@@ -16,6 +17,7 @@
   const SECTIONS = [
     { id: 'template', label: t('template'), component: TemplateSection },
     { id: 'playback', label: t('nav_playback'), component: PlaybackSection },
+    { id: 'shots', label: t('nav_shots'), component: ShotsSection },
     { id: 'postfx', label: t('postfx'), component: PostFxSection },
     { id: 'effects', label: t('effects_library'), component: EffectsSection },
     { id: 'ai', label: t('ai_panel'), component: AiSection },

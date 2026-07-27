@@ -801,6 +801,29 @@ body.pv-panels-hidden .pv-footer {
   }
 }
 
+/* AI Generator panel */
+#ai-prompt-input {
+  resize: vertical;
+  overflow-y: auto;
+  min-height: 60px;
+}
+
+#ai-generate-btn {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.ai-settings {
+  margin-top: 10px;
+}
+
+.ai-settings > summary.panel-title {
+  font-size: 11px;
+  padding: 4px 0;
+  border: none;
+  margin-bottom: 0;
+}
+
 /* AI Loader Overlay - 只覆盖画面，不盖住控制面板 */
 .ai-loader-overlay {
   position: absolute;

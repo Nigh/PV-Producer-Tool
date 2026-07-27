@@ -290,22 +290,22 @@ app.innerHTML = `
       <details class="collapsible-section" open>
         <summary class="panel-title">${t('ai_panel')}</summary>
         <div class="control-group">
-          <textarea id="ai-prompt-input" rows="3" placeholder="${t('ai_prompt_placeholder')}" style="width:100%; box-sizing:border-box; resize:vertical; padding:8px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-color); font-family:inherit;"></textarea>
-          <button id="ai-generate-btn" class="btn" style="width:100%; margin-top:8px;">${t('ai_generate_btn')}</button>
+          <textarea id="ai-prompt-input" rows="3" placeholder="${t('ai_prompt_placeholder')}"></textarea>
+          <button id="ai-generate-btn" class="btn">${t('ai_generate_btn')}</button>
         </div>
-        <details class="collapsible-section" style="margin-top: 10px; border:none; padding: 0;">
-          <summary class="panel-title" style="font-size: 11px; padding: 4px 0; border:none; display:flex; align-items:center;">⚙️ ${t('ai_settings')}</summary>
-          <div class="control-group" style="margin-top:6px;">
+        <details class="collapsible-section ai-settings">
+          <summary class="panel-title">⚙️ ${t('ai_settings')}</summary>
+          <div class="control-group">
             <label>${t('ai_api_key')}</label>
-            <input type="password" id="ai-api-key" placeholder="sk-..." style="width:100%; box-sizing:border-box; padding:6px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-color);">
+            <input type="password" id="ai-api-key" placeholder="sk-...">
           </div>
           <div class="control-group">
             <label>${t('ai_api_url')}</label>
-            <input type="text" id="ai-api-url" placeholder="https://api.deepseek.com" style="width:100%; box-sizing:border-box; padding:6px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-color);">
+            <input type="text" id="ai-api-url" placeholder="https://api.deepseek.com">
           </div>
           <div class="control-group">
             <label>${t('ai_api_model')}</label>
-            <input type="text" id="ai-api-model" placeholder="deepseek-v4-flash" style="width:100%; box-sizing:border-box; padding:6px; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-color);">
+            <input type="text" id="ai-api-model" placeholder="deepseek-v4-flash">
           </div>
         </details>
       </details>

@@ -9,6 +9,24 @@ export function showToast(msg: string) {
   setTimeout(() => el.remove(), 2200);
 }
 
+/** Simple message modal with a single confirm button. */
+export function showModal(contentHtml: string, confirmText: string): void {
+  const overlay = document.createElement('div');
+  overlay.className = 'pv-modal-overlay';
+  overlay.innerHTML = `
+    <div class="pv-modal-box">
+      <div class="pv-modal-body">${contentHtml}</div>
+      <div class="pv-modal-footer">
+        <button class="btn pv-modal-confirm">${confirmText}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector('.pv-modal-confirm')!
+    .addEventListener('click', () => overlay.remove());
+  attachModalDismiss(overlay);
+}
+
 /**
  * Attach dismiss behaviour (click-outside + Escape) to a modal overlay.
  * Listeners are automatically cleaned up when the overlay is removed.

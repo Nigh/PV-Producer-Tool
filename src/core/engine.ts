@@ -364,6 +364,25 @@ export class PVEngine {
     return index * this._segmentDuration;
   }
 
+  /** 当前播放所在的文本段/歌词行索引（段开始前为 -1）。 */
+  get currentSegmentIndex(): number {
+    return this.currentSegmentInfo(this._playbackTime).index;
+  }
+
+  /** 跳到上一句/段起点；已在首句则停在首句。 */
+  seekPrevSegment(): void {
+    const idx = Math.max(0, this.currentSegmentIndex);
+    this.seek(this.segmentStartTime(Math.max(0, idx - 1)));
+  }
+
+  /** 跳到下一句/段起点；已在末句则停在末句。 */
+  seekNextSegment(): void {
+    const n = this.segmentTexts.length;
+    if (n === 0) return;
+    const idx = Math.max(0, this.currentSegmentIndex);
+    this.seek(this.segmentStartTime(Math.min(n - 1, idx + 1)));
+  }
+
   private syncShotCamera(): void {
     const hasShots = this._shots.some((s) => !!s);
     if (!this.originalImage || !hasShots) {

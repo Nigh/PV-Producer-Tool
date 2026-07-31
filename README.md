@@ -1,4 +1,10 @@
-# PV Producer Tool — Kinetic Typography & Post-Processing for Music Videos
+<div align="center">
+
+<img src="icon.png" alt="PV Producer Tool icon" width="128" />
+
+<img src="title.svg" alt="PV Producer Tool — Kinetic Typography &amp; Post-Processing for Music Videos" width="680" />
+
+</div>
 
 >[!NOTE]
 **This is a fork** of [DanteAlighieri13210914/pv-tool](https://github.com/DanteAlighieri13210914/pv-tool).  

@@ -125,6 +125,13 @@ export function buildRuntimeTemplateSnapshot(base: TemplateConfig, name = base.n
   return snapshot;
 }
 
+/** 将分镜数组补齐/截到指定行数（空槽填 null，与歌词行索引对齐）。 */
+export function padShots(shots: (Shot | null)[], len: number): (Shot | null)[] {
+  const out: (Shot | null)[] = shots.slice(0, Math.max(0, len));
+  while (out.length < len) out.push(null);
+  return out;
+}
+
 /** 更新分镜列表（编辑器 → 引擎）。 */
 export function setShots(shots: (Shot | null)[]): void {
   ui.shots = shots;

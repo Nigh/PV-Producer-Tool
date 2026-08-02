@@ -30,10 +30,11 @@ export const en: Record<LocaleKey, string> = {
 
   // Still-image shots
   'shots_need_image': 'Pick an illustration (still image) in Assets and click Apply first',
-  'shot_hint': 'Select a lyric line (selection loops playback within it), then drag to frame it (box locks to canvas aspect); drag inside to move, corner to resize',
+  'shot_hint': 'Select a lyric line, then drag to frame it (box locks to canvas aspect); drag inside to move, corner to resize',
   'shot_unset': 'No frame for this line — drag on the image to add one',
   'shot_pick_line': 'Select a lyric line on the left first',
   'shot_exit_focus': 'Deselect',
+  'shot_single_edit': 'Single-line edit',
   'shot_motion_amount': 'Motion amount',
   'loop_line': 'Looping line',
   'loop_exit': 'Exit line loop',

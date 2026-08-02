@@ -562,18 +562,44 @@ textarea.textarea {
 
 .shot-opt-row {
   display: flex;
-  gap: 6px;
+  gap: 8px 12px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .shot-opt {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
   font-size: 0.65rem;
   color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+}
+
+.shot-opt-select {
+  width: 9.5rem;
+  max-width: 9.5rem;
+}
+
+.shot-sliders {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
+  max-width: 28rem;
+}
+
+.shot-controls {
+  max-width: 36rem;
+}
+
+.shot-single-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+  cursor: pointer;
 }
 
 .shot-lines {
@@ -584,6 +610,25 @@ textarea.textarea {
   overflow-y: auto;
   /* 列方向 flex 容器里 overflow:auto 的子项会被压到 0 高，禁止收缩 */
   flex-shrink: 0;
+}
+
+.shot-line-item {
+  position: relative;
+}
+
+/* 与上一句同一镜：竖线连到上一行的点中心 */
+.shot-line-cont::before {
+  content: '';
+  position: absolute;
+  left: calc(6px + 3.5px);
+  top: calc(-50% - 2px);
+  height: calc(50% + 2px);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--color-primary);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .shot-line {
@@ -604,11 +649,15 @@ textarea.textarea {
 }
 
 .shot-line-active {
-  background: color-mix(in oklab, var(--color-primary) 20%, transparent);
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  background: color-mix(in oklab, var(--color-primary) 8%, transparent);
   color: var(--color-base-content);
 }
 
 .shot-line-dot {
+  position: relative;
+  z-index: 1;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -619,6 +668,12 @@ textarea.textarea {
 .shot-line-dot-set {
   background: var(--color-primary);
   border-color: var(--color-primary);
+}
+
+/* 沿用上一镜：空心主色点 */
+.shot-line-dot-inherit {
+  border-color: var(--color-primary);
+  background: transparent;
 }
 
 .shot-line-idx {
@@ -734,6 +789,11 @@ textarea.textarea {
 
   .shots-grid {
     grid-template-columns: 1fr;
+  }
+
+  .shot-sliders {
+    grid-template-columns: 1fr;
+    max-width: none;
   }
 }
 

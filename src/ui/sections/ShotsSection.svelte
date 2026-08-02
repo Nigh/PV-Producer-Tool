@@ -7,6 +7,7 @@
   import type { Shot, ShotRect, ShotTransition, ShotMotion } from '../../core/types';
   import {
     ui, engine, setShots, padShots, fullFrameShotRect, tplName, focusLine, clearLineFocus,
+    setSingleLineEdit,
   } from '../store.svelte';
   import {
     canvasAspect, shotNormAspect, aspectRectFromDrag, aspectRectFromResize, refitRectToAspect,
@@ -254,13 +255,28 @@
     if (changed) setShots(shots);
   }
 
-  // 选中即句内循环；再点一次同一句 = 退出聚焦
+  // 选中即聚焦；再点一次同一句 = 退出聚焦
   function selectLine(i: number) {
     if (selected === i) {
       clearLineFocus();
     } else {
       focusLine(i);
     }
+  }
+
+  /** 本句有效分镜槽位：自身有定义则用自身，否则向前回退；无则 -1 */
+  function resolveShotSlot(i: number): number {
+    for (let j = Math.min(i, ui.shots.length - 1); j >= 0; j--) {
+      if (ui.shots[j]) return j;
+    }
+    return -1;
+  }
+
+  /** 与上一句是否同一分镜（用于标记连线） */
+  function sameShotAsPrev(i: number): boolean {
+    if (i <= 0) return false;
+    const slot = resolveShotSlot(i);
+    return slot >= 0 && slot === resolveShotSlot(i - 1);
   }
 </script>
 
@@ -272,20 +288,33 @@
       <p class="shots-empty">{t('shot_hint')}</p>
       <ul class="shot-lines">
         {#each lines as line, i (i)}
-          <li>
+          <li class="shot-line-item" class:shot-line-cont={sameShotAsPrev(i)}>
             <button
               class="shot-line"
               class:shot-line-active={selected === i}
               onclick={() => selectLine(i)}
             >
-              <span class="shot-line-dot" class:shot-line-dot-set={!!ui.shots[i]}></span>
+              <span
+                class="shot-line-dot"
+                class:shot-line-dot-set={!!ui.shots[i]}
+                class:shot-line-dot-inherit={!ui.shots[i] && resolveShotSlot(i) >= 0}
+              ></span>
               <span class="shot-line-idx">{i + 1}</span>
               <span class="shot-line-text">{line || '—'}</span>
-              {#if selected === i}<span class="shot-line-loop">🔁</span>{/if}
+              {#if selected === i && ui.singleLineEdit}<span class="shot-line-loop">🔁</span>{/if}
             </button>
           </li>
         {/each}
       </ul>
+      <label class="shot-single-toggle">
+        <input
+          type="checkbox"
+          class="toggle toggle-xs toggle-primary"
+          checked={ui.singleLineEdit}
+          onchange={(e) => setSingleLineEdit((e.currentTarget as HTMLInputElement).checked)}
+        />
+        <span>{t('shot_single_edit')}</span>
+      </label>
     </div>
 
     <div class="shots-col">
@@ -328,11 +357,11 @@
   </div>
 
   {#if currentShot}
-    <div class="control-group">
+    <div class="control-group shot-controls">
       <div class="shot-opt-row">
         <label class="shot-opt">
           <span>{t('shot_in')}</span>
-          <select class="select select-xs" value={currentShot.in ?? 'fade'}
+          <select class="select select-xs shot-opt-select" value={currentShot.in ?? 'fade'}
             onchange={(e) => updateShot({ in: (e.currentTarget as HTMLSelectElement).value as ShotTransition })}>
             {#each TRANSITIONS as tr (tr)}
               <option value={tr}>{t(('tr_' + tr) as any)}</option>
@@ -341,7 +370,7 @@
         </label>
         <label class="shot-opt">
           <span>{t('shot_out')}</span>
-          <select class="select select-xs" value={currentShot.out ?? 'fade'}
+          <select class="select select-xs shot-opt-select" value={currentShot.out ?? 'fade'}
             onchange={(e) => updateShot({ out: (e.currentTarget as HTMLSelectElement).value as ShotTransition })}>
             {#each TRANSITIONS as tr (tr)}
               <option value={tr}>{t(('tr_' + tr) as any)}</option>
@@ -350,46 +379,48 @@
         </label>
         <label class="shot-opt">
           <span>{t('shot_motion')}</span>
-          <select class="select select-xs" value={currentShot.motion ?? 'none'}
+          <select class="select select-xs shot-opt-select" value={currentShot.motion ?? 'none'}
             onchange={(e) => updateShot({ motion: (e.currentTarget as HTMLSelectElement).value as ShotMotion })}>
             {#each MOTIONS as mo (mo)}
               <option value={mo}>{t(('mo_' + mo) as any)}</option>
             {/each}
           </select>
         </label>
+        <label class="shot-opt">
+          <span>{t('shot_template')}</span>
+          <select class="select select-xs shot-opt-select" value={currentShot.template ?? ''} onchange={onShotTemplateChange}>
+            <option value="">{t('shot_tpl_inherit')}</option>
+            {#each templateOptions as opt (opt.value)}
+              <option value={opt.value}>{opt.label}</option>
+            {/each}
+          </select>
+        </label>
       </div>
-      {#if (currentShot.motion ?? 'none') !== 'none'}
-        <Slider
-          label={t('shot_motion_amount')} display={`${ovMotionAmount.toFixed(1)}x`}
-          min={0} max={2} step={0.1} bind:value={ovMotionAmount}
-          oninput={() => setOverride({ motionAmount: ovMotionAmount })}
-        />
-      {/if}
-      <label class="shot-opt">
-        <span>{t('shot_template')}</span>
-        <select class="select select-xs" value={currentShot.template ?? ''} onchange={onShotTemplateChange}>
-          <option value="">{t('shot_tpl_inherit')}</option>
-          {#each templateOptions as opt (opt.value)}
-            <option value={opt.value}>{opt.label}</option>
-          {/each}
-        </select>
-      </label>
 
-      <Slider
-        label={t('anim_speed')} display={`${ovSpeed.toFixed(1)}x${currentShot.animationSpeed === undefined ? ` (${t('shot_follow_global')})` : ''}`}
-        min={0} max={4} step={0.1} bind:value={ovSpeed}
-        oninput={() => setOverride({ animationSpeed: ovSpeed })}
-      />
-      <Slider
-        label={t('motion_intensity')} display={`${ovMotion.toFixed(1)}x${currentShot.motionIntensity === undefined ? ` (${t('shot_follow_global')})` : ''}`}
-        min={0} max={2} step={0.1} bind:value={ovMotion}
-        oninput={() => setOverride({ motionIntensity: ovMotion })}
-      />
-      <Slider
-        label={t('bg_opacity')} display={`${Math.round(ovOpacity * 100)}%${currentShot.bgOpacity === undefined ? ` (${t('shot_follow_global')})` : ''}`}
-        min={0} max={1} step={0.05} bind:value={ovOpacity}
-        oninput={() => setOverride({ bgOpacity: ovOpacity })}
-      />
+      <div class="shot-sliders">
+        {#if (currentShot.motion ?? 'none') !== 'none'}
+          <Slider
+            label={t('shot_motion_amount')} display={`${ovMotionAmount.toFixed(1)}x`}
+            min={0} max={2} step={0.1} bind:value={ovMotionAmount}
+            oninput={() => setOverride({ motionAmount: ovMotionAmount })}
+          />
+        {/if}
+        <Slider
+          label={t('anim_speed')} display={`${ovSpeed.toFixed(1)}x${currentShot.animationSpeed === undefined ? ` (${t('shot_follow_global')})` : ''}`}
+          min={0} max={4} step={0.1} bind:value={ovSpeed}
+          oninput={() => setOverride({ animationSpeed: ovSpeed })}
+        />
+        <Slider
+          label={t('motion_intensity')} display={`${ovMotion.toFixed(1)}x${currentShot.motionIntensity === undefined ? ` (${t('shot_follow_global')})` : ''}`}
+          min={0} max={2} step={0.1} bind:value={ovMotion}
+          oninput={() => setOverride({ motionIntensity: ovMotion })}
+        />
+        <Slider
+          label={t('bg_opacity')} display={`${Math.round(ovOpacity * 100)}%${currentShot.bgOpacity === undefined ? ` (${t('shot_follow_global')})` : ''}`}
+          min={0} max={1} step={0.05} bind:value={ovOpacity}
+          oninput={() => setOverride({ bgOpacity: ovOpacity })}
+        />
+      </div>
 
       <div class="template-actions">
         <button class="btn btn-xs" onclick={resetOverrides}>{t('shot_reset_overrides')}</button>

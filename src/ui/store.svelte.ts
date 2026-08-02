@@ -98,8 +98,10 @@ export const ui = $state({
 
   // 静止画分镜（按歌词行/文本段索引对齐，可稀疏）
   shots: [] as (Shot | null)[],
-  /** 分镜编辑器聚焦的歌词行（播放锁在句内循环）；null = 未聚焦 */
+  /** 分镜编辑器聚焦的歌词行（编辑目标）；null = 未聚焦 */
   focusedLine: null as number | null,
+  /** 选中歌词时是否自动进入句内循环预览 */
+  singleLineEdit: true,
 
   // 杂项
   canvasColor: '',
@@ -160,19 +162,44 @@ export function setShots(shots: (Shot | null)[]): void {
   engine.setShots(cloneJson($state.snapshot(shots)) as (Shot | null)[]);
 }
 
-/** 聚焦一句歌词：播放进度锁在句内循环，并跳到句中段（转场已完成的帧）。 */
+/** 聚焦一句歌词；singleLineEdit 开启时同时锁句内循环并跳到句中段。 */
 export function focusLine(index: number): void {
   ui.focusedLine = index;
-  engine.loopSegment = index;
-  const start = engine.segmentStartTime(index);
-  const end = engine.segmentEndTime(index);
-  engine.seek(Math.max(0, start + Math.max(0, end - start) / 2));
+  if (ui.singleLineEdit) {
+    engine.loopSegment = index;
+    const start = engine.segmentStartTime(index);
+    const end = engine.segmentEndTime(index);
+    engine.seek(Math.max(0, start + Math.max(0, end - start) / 2));
+  } else {
+    engine.loopSegment = null;
+  }
 }
 
 /** 取消歌词聚焦（退出句内循环）。 */
 export function clearLineFocus(): void {
   ui.focusedLine = null;
   engine.loopSegment = null;
+}
+
+/** 切换单句编辑：开时对当前选中行立刻进入句内循环；关时只解除循环。 */
+export function setSingleLineEdit(on: boolean): void {
+  ui.singleLineEdit = on;
+  if (on && ui.focusedLine !== null) {
+    focusLine(ui.focusedLine);
+  } else {
+    engine.loopSegment = null;
+  }
+}
+
+/** 播放/暂停切换（播放条与全局快捷键共用）。 */
+export function togglePause(): void {
+  if (engine.paused) {
+    engine.resume();
+    ui.paused = false;
+  } else {
+    engine.pause();
+    ui.paused = true;
+  }
 }
 
 export function setAspectRatio(ar: AspectRatio): void {

@@ -29,8 +29,8 @@ export const ja: Record<LocaleKey, string> = {
   'theme_light': 'ライトテーマ',
 
   // 静止画カット割り
-  'shots_need_image': '先に「再生と素材」で曲絵（静止画）を読み込んでください',
-  'shot_hint': '下の歌詞行を選んでから枠をドラッグ（枠の比率は画角に固定）。枠内で移動、右下で拡縮',
+  'shots_need_image': '先に「素材」で曲絵（静止画）を選び「適用」を押してください',
+  'shot_hint': '上の歌詞行を選んでから枠をドラッグ（枠の比率は画角に固定）。枠内で移動、右下で拡縮',
   'shot_unset': 'この行は未設定 — 画像上をドラッグして追加',
   'shot_fill_unset': '未設定行を全画面で埋める',
   'shot_copy_prev': '前のカットをコピー',

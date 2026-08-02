@@ -29,7 +29,7 @@ export const en: Record<LocaleKey, string> = {
   'theme_light': 'Light Theme',
 
   // Still-image shots
-  'shots_need_image': 'Load an illustration (still image) in Playback first',
+  'shots_need_image': 'Pick an illustration (still image) in Assets and click Apply first',
   'shot_hint': 'Select a lyric line, then drag to frame it (box locks to canvas aspect); drag inside to move, corner to resize',
   'shot_unset': 'No frame for this line — drag on the image to add one',
   'shot_fill_unset': 'Fill unset lines (full frame)',

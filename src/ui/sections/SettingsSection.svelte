@@ -9,22 +9,6 @@
   import { theme, setTheme } from '../theme.svelte';
   import Slider from '../Slider.svelte';
 
-  const SWATCHES = [
-    { color: '#ffffff', key: 'white' },
-    { color: '#000000', key: 'black' },
-    { color: '#1122ee', key: 'blue' },
-    { color: '#8b1a1a', key: 'red' },
-    { color: '#EEDD11', key: 'yellow' },
-    { color: '#f5c6d0', key: 'pink' },
-    { color: '#ED1C24', key: 'p5red' },
-    { color: '#ABC5D2', key: 'light_blue' },
-  ] as const;
-
-  function setCanvasColor(color: string) {
-    ui.canvasColor = color;
-    engine.canvasColor = color || null;
-  }
-
   // ── 字体（Local Font Access API，仅 Chromium 桌面）──
   const fontApiAvailable = 'queryLocalFonts' in window;
   let fontBtnVisible = $state(true);
@@ -96,29 +80,6 @@
     <option value="16:9">{t('aspect_16_9')}</option>
     <option value="9:16">{t('aspect_9_16')}</option>
   </select>
-</div>
-
-<div class="control-group">
-  <label for="canvas-color-swatches">{t('canvas_color')}</label>
-  <div class="color-swatches" id="canvas-color-swatches">
-    <button
-      class="swatch"
-      class:swatch-active={ui.canvasColor === ''}
-      title={t('follow_template')}
-      aria-label={t('follow_template')}
-      onclick={() => setCanvasColor('')}
-    ><span class="swatch-auto">A</span></button>
-    {#each SWATCHES as sw (sw.color)}
-      <button
-        class="swatch"
-        class:swatch-active={ui.canvasColor === sw.color}
-        title={t(sw.key)}
-        aria-label={t(sw.key)}
-        style="background:{sw.color}"
-        onclick={() => setCanvasColor(sw.color)}
-      ></button>
-    {/each}
-  </div>
 </div>
 
 {#if fontApiAvailable}

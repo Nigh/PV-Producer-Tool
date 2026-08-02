@@ -55,6 +55,10 @@ assert.equal(evalMotion('zoomOut', 1).zoom, 1);
 assert.ok(evalMotion('panRight', 0).dx < 0 && evalMotion('panRight', 1).dx > 0);
 assert.ok(evalMotion('panLeft', 0).dx > 0 && evalMotion('panLeft', 1).dx < 0);
 assert.ok(evalMotion('panDown', 1).dy > 0 && evalMotion('panUp', 1).dy < 0);
+// 幅度倍率：0 = 无运动，2 = 两倍行程
+assert.deepEqual(evalMotion('zoomIn', 1, 0), { zoom: 1, dx: 0, dy: 0 });
+assert.ok(Math.abs(evalMotion('zoomIn', 1, 2).zoom - 1.24) < 1e-9);
+assert.ok(Math.abs(evalMotion('panRight', 1, 2).dx - 2 * evalMotion('panRight', 1).dx) < 1e-9);
 
 // ── transitionWindow：1/4 段长，夹 0.15..0.6 ──
 assert.equal(transitionWindow(2), 0.5);

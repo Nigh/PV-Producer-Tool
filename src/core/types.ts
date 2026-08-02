@@ -68,6 +68,8 @@ export interface Shot {
   in?: ShotTransition;
   out?: ShotTransition;
   motion?: ShotMotion;
+  /** 运镜幅度倍率（0..2，缺省 1）。 */
+  motionAmount?: number;
   /** 模板选择值（'0'..'N' 内置 | 'user-N'）；空 = 沿用上一镜的模板。 */
   template?: string;
   /** 以下为空 = 跟随全局默认。 */

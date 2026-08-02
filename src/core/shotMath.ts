@@ -39,11 +39,14 @@ export function ease(p: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** 过程运动（Ken Burns）：返回 zoom 倍率与以 rect 尺寸为单位的平移。 */
-export function evalMotion(motion: ShotMotion, p: number): { zoom: number; dx: number; dy: number } {
+/**
+ * 过程运动（Ken Burns）：返回 zoom 倍率与以 rect 尺寸为单位的平移。
+ * amount 为幅度倍率（0..2，1 = 默认幅度）。
+ */
+export function evalMotion(motion: ShotMotion, p: number, amount = 1): { zoom: number; dx: number; dy: number } {
   const t = ease(p);
-  const PAN = 0.08;   // 平移总行程：rect 尺寸的 ±8%
-  const ZOOM = 0.12;  // 推拉幅度：12%
+  const PAN = 0.08 * amount;   // 平移总行程：rect 尺寸的 ±8% × 幅度
+  const ZOOM = 0.12 * amount;  // 推拉幅度：12% × 幅度
   switch (motion) {
     case 'zoomIn': return { zoom: 1 + ZOOM * t, dx: 0, dy: 0 };
     case 'zoomOut': return { zoom: 1 + ZOOM * (1 - t), dx: 0, dy: 0 };
@@ -118,6 +121,8 @@ export interface ShotViewInput {
   screenW: number;
   screenH: number;
   motion: ShotMotion;
+  /** 运镜幅度倍率（缺省 1） */
+  motionAmount?: number;
   inType: ShotTransition;
   outType: ShotTransition;
   /** 段内时间（秒） */
@@ -146,7 +151,7 @@ export function computeShotView(input: ShotViewInput): ShotView {
   const rh = rect.h * imgH;
   const s0 = coverScale(rw, rh, screenW, screenH);
 
-  const motion = evalMotion(input.motion, duration > 0 ? clamp01(t / duration) : 0);
+  const motion = evalMotion(input.motion, duration > 0 ? clamp01(t / duration) : 0, input.motionAmount ?? 1);
   const trans = evalTransition(input.inType, input.outType, t, duration);
 
   const zt = s0 * motion.zoom * trans.zoomBoost;

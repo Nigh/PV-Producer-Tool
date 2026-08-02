@@ -136,6 +136,7 @@ export class ShotCamera {
       texScale: entry.texScale,
       screenW, screenH,
       motion: shot.motion ?? 'none',
+      motionAmount: shot.motionAmount ?? 1,
       inType, outType,
       t, duration,
     });

@@ -1260,6 +1260,8 @@ export class PVEngine {
       this.shotCamera.update(
         seg.index, ctx.segmentTime, seg.duration,
         ctx.screenWidth, ctx.screenHeight,
+        (i) => this.segmentStartTime(i),
+        (i) => this.segmentEndTime(i),
       );
     }
 

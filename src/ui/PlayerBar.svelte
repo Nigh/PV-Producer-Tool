@@ -21,6 +21,11 @@
       if (!isSeeking && ui.timelineDuration > 0) {
         seekValue = ui.playbackTime / ui.timelineDuration;
       }
+      // 非单句模式：选中跟随当前歌词段
+      if (!ui.singleLineEdit) {
+        const idx = engine.currentSegmentIndex;
+        ui.focusedLine = idx >= 0 ? idx : null;
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);

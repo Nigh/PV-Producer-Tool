@@ -7,7 +7,8 @@
 import assert from 'node:assert/strict';
 import {
   coverScale, expandRect, ease, evalMotion, evalTransition,
-  transitionWindow, computeShotView,
+  transitionWindow, computeShotView, shotRunRange, shotRunMotionClock,
+  resolveShotOutTransition,
 } from '../src/core/shotMath.ts';
 import {
   canvasAspect, shotNormAspect, maxCenteredRect, refitRectToAspect, aspectRectFromDrag,
@@ -162,6 +163,37 @@ assert.equal(transitionWindow(10), 0.6);
     motion: 'panRight', inType: 'cut', outType: 'cut', t: 4, duration: 4,
   });
   assert.ok(panned.x < base.x);
+}
+
+// ── resolveShotOutTransition：切镜/沿用不透底 ──
+assert.equal(resolveShotOutTransition('fade', 0, -1), 'fade'); // 末镜可淡出
+assert.equal(resolveShotOutTransition('fade', 0, 0), 'cut');   // 沿用同镜
+assert.equal(resolveShotOutTransition('fade', 0, 1), 'cut');   // 切到下一镜
+assert.equal(resolveShotOutTransition('slide', 0, 1), 'slide'); // 非 fade 保留
+assert.equal(resolveShotOutTransition('zoom', 0, 0), 'cut');
+
+// ── shotRunRange：稀疏分镜的连续覆盖区间 ──
+{
+  const shots = [{}, null, null, {}, null] as (object | null)[];
+  assert.deepEqual(shotRunRange(shots, 0), { start: 0, end: 2 });
+  assert.deepEqual(shotRunRange(shots, 3), { start: 3, end: 4 });
+  assert.deepEqual(shotRunRange([{}], 0), { start: 0, end: 0 });
+}
+
+// ── shotRunMotionClock：三等长句跨镜时第二句中点 ≈ 0.5 ──
+{
+  const starts = [0, 3, 6];
+  const ends = [3, 6, 9];
+  const clock = shotRunMotionClock({
+    runStart: 0,
+    runEnd: 2,
+    index: 1,
+    segmentT: 1.5,
+    startAt: (i) => starts[i]!,
+    endAt: (i) => ends[i]!,
+  });
+  assert.ok(Math.abs(clock.duration - 9) < 1e-9);
+  assert.ok(Math.abs(clock.t / clock.duration - 0.5) < 1e-9);
 }
 
 // ── shotAspect：画幅锁定矩形 ──

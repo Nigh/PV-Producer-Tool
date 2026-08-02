@@ -5,7 +5,6 @@
   import { ui, engine, applyTextInput } from '../store.svelte';
 
   let textExpanded = $state(false);
-  let pendingFile: File | null = $state(null);
 
   // ── LRC 文本（防抖应用）──
   let textTimer: ReturnType<typeof setTimeout>;
@@ -26,21 +25,14 @@
     lrcInput.value = '';
   }
 
-  // ── 曲绘 ──
+  // ── 曲绘：选择后立刻 Auto Fit 应用 ──
   let mediaInput: HTMLInputElement;
-  function onMediaChange() {
+  async function onMediaChange() {
     const file = mediaInput.files?.[0];
-    if (file) {
-      pendingFile = file;
-      ui.mediaName = file.name;
-      ui.mediaPicked = true;
-    }
-  }
-
-  async function applyMedia() {
-    if (!pendingFile) return;
+    if (!file) return;
+    ui.mediaName = file.name;
     try {
-      await engine.addMedia(pendingFile, ui.mediaMode);
+      await engine.addMedia(file, 'fit');
       engine.effectOpacity = 0.3;
       ui.opacity = 0.3;
       ui.mediaLoaded = true;
@@ -48,7 +40,7 @@
     } catch (err) {
       console.warn('[PV] Media load failed:', err);
     }
-    pendingFile = null;
+    mediaInput.value = '';
   }
 
   // ── 音频 ──
@@ -122,14 +114,3 @@
     <input type="file" accept="image/*,video/mp4,video/webm,video/mov" hidden bind:this={mediaInput} onchange={onMediaChange} />
   </div>
 </div>
-
-{#if ui.mediaPicked}
-  <div class="control-group">
-    <label for="media-mode">{t('media_mode')}</label>
-    <select id="media-mode" class="select select-sm w-full" bind:value={ui.mediaMode}>
-      <option value="fit">{t('auto_fit')}</option>
-      <option value="free">{t('free_mode')}</option>
-    </select>
-    <button class="btn btn-sm" onclick={applyMedia}>{t('apply')}</button>
-  </div>
-{/if}

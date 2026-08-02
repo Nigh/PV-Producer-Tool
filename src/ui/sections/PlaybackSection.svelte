@@ -1,13 +1,10 @@
 <!-- PV Tool — Copyright (c) 2026 DanteAlighieri13210914
      Licensed under Non-Commercial License. See LICENSE for terms. -->
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { t } from '../../i18n';
   import { ui, engine, applyTextInput } from '../store.svelte';
-  import Slider from '../Slider.svelte';
 
   let textExpanded = $state(false);
-  let isSeeking = $state(false);
   let pendingFile: File | null = $state(null);
 
   // ── LRC 文本（防抖应用）──
@@ -74,60 +71,7 @@
       ui.audioPaused = true;
     }
   }
-
-  // ── 播放时间轴 ──
-  function formatClock(seconds: number): string {
-    const safe = Math.max(0, Math.floor(seconds));
-    return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`;
-  }
-
-  let seekValue = $state(0);
-  onMount(() => {
-    let raf = 0;
-    const tick = () => {
-      ui.playbackTime = engine.playbackTime;
-      ui.timelineDuration = engine.timelineDuration;
-      if (!isSeeking && ui.timelineDuration > 0) {
-        seekValue = ui.playbackTime / ui.timelineDuration;
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  });
-
-  function onSeek() {
-    engine.seek(seekValue * engine.timelineDuration);
-  }
-
-  function togglePause() {
-    if (engine.paused) {
-      engine.resume();
-      ui.paused = false;
-    } else {
-      engine.pause();
-      ui.paused = true;
-    }
-  }
 </script>
-
-<div class="control-group">
-  <label for="seek-slider">{t('timer_label')} <span class="opacity-70">{formatClock(ui.playbackTime)} / {formatClock(ui.timelineDuration)}</span></label>
-  <input
-    id="seek-slider"
-    type="range" class="range range-xs range-primary w-full"
-    min="0" max="1" step="0.001"
-    bind:value={seekValue}
-    oninput={onSeek}
-    onpointerdown={() => { isSeeking = true; }}
-    onpointerup={() => { isSeeking = false; }}
-  />
-  <div class="timeline-controls">
-    <button class="btn btn-sm" title={t('lyric_prev')} aria-label={t('lyric_prev')} onclick={() => engine.seekPrevSegment()}>⏮</button>
-    <button class="btn btn-sm" title={ui.paused ? t('play') : t('pause')} aria-label={ui.paused ? t('play') : t('pause')} onclick={togglePause}>{ui.paused ? '▶' : '⏸'}</button>
-    <button class="btn btn-sm" title={t('lyric_next')} aria-label={t('lyric_next')} onclick={() => engine.seekNextSegment()}>⏭</button>
-  </div>
-</div>
 
 <div class="control-group">
   <label for="text-input">{t('text_label')}</label>
@@ -189,19 +133,3 @@
     <button class="btn btn-sm" onclick={applyMedia}>{t('apply')}</button>
   </div>
 {/if}
-
-<Slider
-  label={t('anim_speed')} display={`${ui.speed.toFixed(1)}x`}
-  min={0} max={4} step={0.1} bind:value={ui.speed}
-  oninput={() => { engine.animationSpeed = ui.speed; }}
-/>
-<Slider
-  label={t('motion_intensity')} display={`${ui.motion.toFixed(1)}x`}
-  min={0} max={2} step={0.1} bind:value={ui.motion}
-  oninput={() => { engine.motionIntensity = ui.motion; }}
-/>
-<Slider
-  label={t('bg_opacity')} display={`${Math.round(ui.opacity * 100)}%`}
-  min={0} max={1} step={0.05} bind:value={ui.opacity}
-  oninput={() => { engine.effectOpacity = ui.opacity; }}
-/>

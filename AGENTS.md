@@ -19,7 +19,7 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 - `src/ui/` — Svelte UI layer:
   - `store.svelte.ts` — runes state (`ui`), the `PVEngine` instance, and all template-management actions (select/save/delete/share-code/AI-generate/URL-param init). The single source of truth for UI↔engine sync.
   - `App.svelte` — left-sidebar navigation shell (nav rail + active section), engine mount, H-key hide-all, AI loader overlay, footer. Mobile: sidebar becomes an overlay drawer.
-  - `sections/` — one component per nav section (Settings first): Settings (aspect 16:9|9:16, BPM + beat offset 0–1, beat react, canvas color/font/FPS/theme/NP-listen), Template, Playback (timestamped LRC only, audio, 曲绘/illustration, timeline), Shots (still-image MAD shot editor: aspect-locked drag-to-frame per lyric line + Ken Burns), PostFx, Effects (grid; toggling while a preset is active auto-switches to Custom), Ai, Export.
+  - `sections/` — one component per nav section (Settings first): Settings (aspect 16:9|9:16, BPM + beat offset 0–1, beat react, canvas color/font/FPS/theme/NP-listen), Assets/素材 (timestamped LRC only, audio, 曲绘/illustration), Shots (per-lyric-line shot editor: aspect-locked framing, per-line template pick + speed/motion/opacity overrides, collapsed Template Manager at the bottom — Template is no longer a nav item), PostFx, Effects (grid; toggling while a preset is active auto-switches to Custom), Ai, Export. Player bar (seek/prev/play/next/clock) sits directly under the preview frame (`PlayerBar.svelte`).
   - `theme.svelte.ts` — xianii / xianii-light theme switch persisted in localStorage; aspect ratio and beat offset also persist there.
   - `recorder.svelte.ts` — MediaRecorder + PNG-sequence (alpha) export. `copyUrl.ts` — copy-URL modal.
   - `Slider.svelte` — labeled range control.
@@ -48,7 +48,8 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 
 ## 5) Known Facts / Gotchas
 
-- Preview stage letterboxes into a fixed 16:9 or 9:16 `#pv-container` frame; PIXI `resizeTo` that frame so export matches the chosen aspect. Lyrics require timestamped LRC (no `/` text split).
+- Preview stage letterboxes into a fixed 16:9 or 9:16 `#pv-container` frame; PIXI `resizeTo` that frame so export matches the chosen aspect. On canvas resize the engine debounces 200ms then reloads the current template so effects re-layout. Lyrics require timestamped LRC (no `/` text split).
+- Templates are per-shot effect sets: `Shot.template` selects the template for that lyric line (inherits forward like the framing rect); `Shot.animationSpeed/motionIntensity/bgOpacity` override globals for that line only. Engine switches templates at segment boundaries via `templateResolver` injected from the UI store.
 - `src/core/` must stay framework-free (no Svelte imports); UI state belongs in `src/ui/store.svelte.ts`.
 - `tsconfig` has `noUnusedLocals`/`noUnusedParameters` — dead code fails the build.
 - Effects must clean up in `destroy()`; `BaseEffect.destroy()` handles the container tree, but external resources (video elements, intervals, canvases) are the effect's responsibility.

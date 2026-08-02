@@ -143,6 +143,24 @@ export class PVEngine {
 
     this.app.stage.filters = [this.hueFilter, this.glitchFilter];
 
+    // 画布尺寸变化（画幅切换/侧栏折叠）后重建特效：多数特效在 setup()
+    // 里按当时的屏幕尺寸摆放元素，只能整体重排。debounce 避免拖拽期间抖动。
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+    let lastW = this.app.screen.width;
+    let lastH = this.app.screen.height;
+    this.app.renderer.on('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const w = this.app.screen.width;
+        const h = this.app.screen.height;
+        if ((w !== lastW || h !== lastH) && this.currentTemplate) {
+          lastW = w;
+          lastH = h;
+          this.loadTemplate(this.currentTemplate);
+        }
+      }, 200);
+    });
+
     this.app.ticker.add((ticker) => {
       const now = performance.now();
       const dt = (now - this._lastFrameTime) / 1000;
@@ -286,7 +304,7 @@ export class PVEngine {
         this.hueShift = template.postfx.hueShift ?? 0;
       }
 
-      if (template.shots) {
+      if (template.shots && !this._shotTemplateSwitch) {
         this.setShots(template.shots);
       }
 
@@ -1077,6 +1095,54 @@ export class PVEngine {
     }
   }
 
+  /** 当前句显式设置的分镜（不向前回退：参数覆盖只对本句生效）。 */
+  private currentShotOverride(lyricClock: number): Shot | null {
+    const idx = this.currentSegmentInfo(lyricClock).index;
+    return idx >= 0 ? this._shots[idx] ?? null : null;
+  }
+
+  /**
+   * 当前句生效的模板选择值：本句未设则向前回退到最近定义（与取景框
+   * resolveSlot 同语义）；全部未设返回 null（保持当前模板）。
+   */
+  private effectiveShotTemplate(lyricClock: number): string | null {
+    const idx = this.currentSegmentInfo(lyricClock).index;
+    for (let i = Math.min(idx, this._shots.length - 1); i >= 0; i--) {
+      const tpl = this._shots[i]?.template;
+      if (tpl !== undefined) return tpl;
+    }
+    return null;
+  }
+
+  /** UI 注入：把模板选择值（'0' | 'user-N'）解析成配置。 */
+  templateResolver: ((sel: string) => TemplateConfig | null) | null = null;
+  /** 逐句模板实际切换时回调（UI 同步下拉/勾选状态）。 */
+  onShotTemplateApplied: ((sel: string) => void) | null = null;
+  private _activeShotTemplateSel: string | null = null;
+
+  private syncShotTemplate(lyricClock: number): void {
+    if (!this.templateResolver) return;
+    const sel = this.effectiveShotTemplate(lyricClock);
+    if (sel === null || sel === this._activeShotTemplateSel) return;
+    const config = this.templateResolver(sel);
+    if (!config) return;
+    this._activeShotTemplateSel = sel;
+    // 逐句切换不能让模板快照里的 shots 覆盖当前分镜列表
+    this._shotTemplateSwitch = true;
+    try {
+      this.loadTemplate(config);
+    } finally {
+      this._shotTemplateSwitch = false;
+    }
+    this.onShotTemplateApplied?.(sel);
+  }
+  private _shotTemplateSwitch = false;
+
+  /** 外部直接换模板（模板管理/URL）后重置逐句追踪，避免误判未变。 */
+  resetShotTemplateTracking(sel: string | null = null): void {
+    this._activeShotTemplateSel = sel;
+  }
+
   private update(time: number, deltaTime: number) {
     const lyricClock = this._npActive
       ? this._npTime
@@ -1084,6 +1150,10 @@ export class PVEngine {
         ? this.beat.currentTime
         : time;
     this._playbackTime = lyricClock;
+
+    // 逐句模板切换须在构建 ctx / 遍历特效之前完成
+    this.syncShotTemplate(lyricClock);
+    const shotOv = this.currentShotOverride(lyricClock);
 
     if (this.motionDetector && this.mediaElement instanceof HTMLVideoElement) {
       this.motionDetector.detect(this.mediaElement);
@@ -1107,8 +1177,8 @@ export class PVEngine {
       screenWidth: this.app.screen.width,
       screenHeight: this.app.screen.height,
       palette: this.palette,
-      animationSpeed: this._animationSpeed,
-      motionIntensity: this._motionIntensity,
+      animationSpeed: shotOv?.animationSpeed ?? this._animationSpeed,
+      motionIntensity: shotOv?.motionIntensity ?? this._motionIntensity,
       currentText: this.getDisplayText(lyricClock),
       segmentTime: this.getSegmentTime(lyricClock),
       beatIntensity: this.beat.getIntensity(lyricClock) * this._beatReactivity,
@@ -1124,6 +1194,13 @@ export class PVEngine {
     }
 
     this.updateBgFill();
+
+    // 逐句背景透明度覆盖（bgFill + background 层一起，语义同 effectOpacity）
+    const bgAlpha = shotOv?.bgOpacity ?? this._effectOpacity;
+    this.bgFill.alpha = bgAlpha;
+    const bgLayer = this.layers.get('background');
+    if (bgLayer) bgLayer.alpha = bgAlpha;
+
     this.applyCameraFX(lyricClock);
 
     if (this.outlineRenderer && this.mediaElement) {

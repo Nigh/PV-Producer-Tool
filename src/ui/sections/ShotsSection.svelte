@@ -2,14 +2,16 @@
      Licensed under Non-Commercial License. See LICENSE for terms. -->
 <script lang="ts">
   import { t } from '../../i18n';
+  import { templates } from '../../templates';
   import type { Shot, ShotRect, ShotTransition, ShotMotion } from '../../core/types';
   import {
-    ui, engine, setShots, padShots, fullFrameShotRect,
+    ui, engine, setShots, padShots, fullFrameShotRect, tplName,
   } from '../store.svelte';
   import {
     canvasAspect, shotNormAspect, aspectRectFromDrag, aspectRectFromResize, refitRectToAspect,
   } from '../../core/shotAspect';
   import Slider from '../Slider.svelte';
+  import TemplateSection from './TemplateSection.svelte';
 
   const TRANSITIONS: ShotTransition[] = ['cut', 'fade', 'slide', 'zoom'];
   const MOTIONS: ShotMotion[] = ['none', 'zoomIn', 'zoomOut', 'panLeft', 'panRight', 'panUp', 'panDown'];
@@ -164,7 +166,53 @@
     const shots = padShots(ui.shots, lines.length);
     const prev = shots.slice(0, selected).reverse().find((s) => !!s);
     if (!prev) return;
+    // 复制完整分镜：取景框 + 转场 + 模板 + 参数覆盖
     shots[selected] = { ...prev, rect: refitRectToAspect({ ...prev.rect }, normAsp) };
+    setShots(shots);
+  }
+
+  // ── 逐句模板 / 参数覆盖 ──
+  const templateOptions = $derived([
+    ...templates.map((tp, i) => ({ value: String(i), label: tplName(tp) })),
+    ...ui.customTemplates.map((tp, i) => ({ value: `user-${i}`, label: `⭐ ${tp.name}` })),
+    ...(ui.sharedTemplate ? [{ value: 'shared', label: `↗ ${ui.sharedTemplate.name}` }] : []),
+  ]);
+
+  function onShotTemplateChange(e: Event) {
+    const v = (e.currentTarget as HTMLSelectElement).value;
+    if (!currentShot) return;
+    const shots = padShots(ui.shots, lines.length);
+    const next = { ...currentShot };
+    if (v === '') delete next.template; else next.template = v;
+    shots[selected] = next;
+    setShots(shots);
+    engine.resetShotTemplateTracking();
+    previewLine(selected);
+  }
+
+  // 滑条需要具体数值：未覆盖时显示全局值，拖动即写入覆盖
+  let ovSpeed = $state(1);
+  let ovMotion = $state(1);
+  let ovOpacity = $state(1);
+  $effect(() => {
+    ovSpeed = currentShot?.animationSpeed ?? ui.speed;
+    ovMotion = currentShot?.motionIntensity ?? ui.motion;
+    ovOpacity = currentShot?.bgOpacity ?? ui.opacity;
+  });
+
+  function setOverride(patch: Partial<Shot>) {
+    if (!currentShot) return;
+    updateShot(patch);
+  }
+
+  function resetOverrides() {
+    if (!currentShot) return;
+    const shots = padShots(ui.shots, lines.length);
+    const next = { ...currentShot };
+    delete next.animationSpeed;
+    delete next.motionIntensity;
+    delete next.bgOpacity;
+    shots[selected] = next;
     setShots(shots);
   }
 
@@ -195,12 +243,6 @@
   <p class="shots-empty">{t('shots_need_image')}</p>
 {:else}
   <p class="shots-empty">{t('shot_hint')}</p>
-
-  <Slider
-    label={t('bg_opacity')} display={`${Math.round(ui.opacity * 100)}%`}
-    min={0} max={1} step={0.05} bind:value={ui.opacity}
-    oninput={() => { engine.effectOpacity = ui.opacity; }}
-  />
 
   <div
     class="shot-frame"
@@ -265,8 +307,35 @@
           </select>
         </label>
       </div>
+      <label class="shot-opt">
+        <span>{t('shot_template')}</span>
+        <select class="select select-xs" value={currentShot.template ?? ''} onchange={onShotTemplateChange}>
+          <option value="">{t('shot_tpl_inherit')}</option>
+          {#each templateOptions as opt (opt.value)}
+            <option value={opt.value}>{opt.label}</option>
+          {/each}
+        </select>
+      </label>
+
+      <Slider
+        label={t('anim_speed')} display={`${ovSpeed.toFixed(1)}x${currentShot.animationSpeed === undefined ? ` (${t('shot_follow_global')})` : ''}`}
+        min={0} max={4} step={0.1} bind:value={ovSpeed}
+        oninput={() => setOverride({ animationSpeed: ovSpeed })}
+      />
+      <Slider
+        label={t('motion_intensity')} display={`${ovMotion.toFixed(1)}x${currentShot.motionIntensity === undefined ? ` (${t('shot_follow_global')})` : ''}`}
+        min={0} max={2} step={0.1} bind:value={ovMotion}
+        oninput={() => setOverride({ motionIntensity: ovMotion })}
+      />
+      <Slider
+        label={t('bg_opacity')} display={`${Math.round(ovOpacity * 100)}%${currentShot.bgOpacity === undefined ? ` (${t('shot_follow_global')})` : ''}`}
+        min={0} max={1} step={0.05} bind:value={ovOpacity}
+        oninput={() => setOverride({ bgOpacity: ovOpacity })}
+      />
+
       <div class="template-actions">
         <button class="btn btn-xs" onclick={() => previewLine(selected)}>{t('shot_preview')}</button>
+        <button class="btn btn-xs" onclick={resetOverrides}>{t('shot_reset_overrides')}</button>
         <button class="btn btn-xs btn-error" onclick={clearShot}>{t('shot_clear')}</button>
       </div>
     </div>
@@ -288,3 +357,8 @@
     {/each}
   </ul>
 {/if}
+
+<details class="collapsible-section">
+  <summary class="panel-title">{t('shot_tpl_manage')}</summary>
+  <TemplateSection />
+</details>

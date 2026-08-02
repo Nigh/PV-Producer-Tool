@@ -282,22 +282,25 @@ function configFor(val: string): TemplateConfig | null {
 
 const syncChannel = new BroadcastChannel('pv-tool-sync');
 
-/** 模板切换入口（下拉框、按钮网格、URL 参数、跨窗口同步共用）。 */
+/** 模板切换入口（模板管理、URL 参数、跨窗口同步共用）。 */
 export function selectTemplate(val: string, broadcast = true): void {
   if (val === 'custom') {
     ui.selected = 'custom';
     engine.loadTemplate(buildCustomTemplate());
+    engine.resetShotTemplateTracking('custom');
   } else {
     const config = configFor(val);
     if (!config) {
       ui.selected = '0';
       engine.loadTemplate(templates[0]);
+      engine.resetShotTemplateTracking('0');
       syncCheckedEffects(templates[0]);
       syncFromEngine();
       return;
     }
     ui.selected = val;
     engine.loadTemplate(config);
+    engine.resetShotTemplateTracking(val);
     syncCheckedEffects(config);
     syncFromEngine();
   }
@@ -443,6 +446,14 @@ export async function toggleNowPlaying(on: boolean): Promise<boolean> {
 export async function initApp(container: HTMLElement): Promise<void> {
   await engine.init(container);
   engine.beat.beatOffset = ui.beatOffset;
+  // 逐句模板：引擎按分镜切换模板时经这里解析选择值并回写 UI 状态
+  engine.templateResolver = (sel) => configFor(sel);
+  engine.onShotTemplateApplied = (sel) => {
+    ui.selected = sel;
+    const config = configFor(sel);
+    if (config) syncCheckedEffects(config);
+    syncFromEngine();
+  };
   applyTextInput(DEFAULT_TEXT);
   engine.onFpsUpdate = (fps) => { ui.fpsActual = fps; };
 

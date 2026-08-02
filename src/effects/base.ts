@@ -34,10 +34,26 @@ export abstract class BaseEffect {
 
   destroy(): void {
     try {
+      // 先摘 filter 再 destroy，避免 Pixi v8 渲染管线读到已销毁 TextureSource.alphaMode
       this._ownContainer.removeChildren().forEach(c => {
-        try { c.destroy({ children: true }); } catch { /* already gone */ }
+        try {
+          detachFiltersDeep(c);
+          c.destroy({ children: true });
+        } catch { /* already gone */ }
       });
+      detachFiltersDeep(this._ownContainer);
       this._ownContainer.destroy();
     } catch { /* container already destroyed */ }
   }
+}
+
+/** 递归清空 filters，销毁前调用。 */
+export function detachFiltersDeep(root: PIXI.Container): void {
+  const walk = (node: PIXI.Container) => {
+    if (node.filters?.length) node.filters = null;
+    for (const child of node.children) {
+      if (child instanceof PIXI.Container) walk(child);
+    }
+  };
+  walk(root);
 }

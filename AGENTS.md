@@ -48,7 +48,7 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 
 ## 5) Known Facts / Gotchas
 
-- Preview stage letterboxes into a fixed 16:9 or 9:16 `#pv-container` frame; PIXI `resizeTo` that frame so export matches the chosen aspect. On canvas resize the engine debounces 200ms then reloads the current template so effects re-layout. Lyrics require timestamped LRC (no `/` text split).
+- Preview stage letterboxes into a fixed 16:9 or 9:16 `#pv-container` frame; PIXI `resizeTo` that frame so export matches the chosen aspect. On canvas resize the engine debounces 200ms then **schedules** a template reload for the next ticker tick (never destroy the scene graph inside a resize/render callback — Pixi v8 will crash on null `TextureSource.alphaMode`). Same deferral applies to per-shot template switches. Destroy paths clear `filters` before `destroy()`. Lyrics require timestamped LRC (no `/` text split).
 - Templates are per-shot effect sets: `Shot.template` selects the template for that lyric line (inherits forward like the framing rect); `Shot.animationSpeed/motionIntensity/bgOpacity` override globals for that line only. Engine switches templates at segment boundaries via `templateResolver` injected from the UI store.
 - `src/core/` must stay framework-free (no Svelte imports); UI state belongs in `src/ui/store.svelte.ts`.
 - `tsconfig` has `noUnusedLocals`/`noUnusedParameters` — dead code fails the build.

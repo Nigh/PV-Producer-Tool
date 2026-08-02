@@ -4,7 +4,7 @@
 import * as PIXI from 'pixi.js';
 import type { TemplateConfig, UpdateContext, ColorPalette, LayerType, MotionTargetInfo, LyricLine, Shot } from './types';
 import { ShotCamera } from './shotCamera';
-import { createEffect, BaseEffect } from '../effects';
+import { createEffect, BaseEffect, detachFiltersDeep } from '../effects';
 import { extractDominantColors } from './colorExtractor';
 import { MediaOutlineRenderer } from './mediaOutline';
 import { GlitchFilter } from './glitchFilter';
@@ -76,6 +76,10 @@ export class PVEngine {
   private _currentResolution = 1;
   private _resizeParent: HTMLElement | null = null;
   private _loading = false;
+  /** 帧边界再重建：避免 resize/update 中途拆树导致 Pixi alphaMode 空引用崩溃。 */
+  private _pendingTemplate: TemplateConfig | null = null;
+  private _pendingShotSwitch = false;
+  private _pendingShotSel: string | null = null;
   private _bgColorOverride: string | null = null;
   private _fontFamilyOverride: string | null = null;
   private _tick = 0;
@@ -144,7 +148,8 @@ export class PVEngine {
     this.app.stage.filters = [this.hueFilter, this.glitchFilter];
 
     // 画布尺寸变化（画幅切换/侧栏折叠）后重建特效：多数特效在 setup()
-    // 里按当时的屏幕尺寸摆放元素，只能整体重排。debounce 避免拖拽期间抖动。
+    // 里按当时的屏幕尺寸摆放元素，只能整体重排。debounce 后挂到下一帧
+    // ticker 开头执行，绝不在 resize→render 回调里同步 destroy。
     let resizeTimer: ReturnType<typeof setTimeout> | undefined;
     let lastW = this.app.screen.width;
     let lastH = this.app.screen.height;
@@ -156,12 +161,15 @@ export class PVEngine {
         if ((w !== lastW || h !== lastH) && this.currentTemplate) {
           lastW = w;
           lastH = h;
-          this.loadTemplate(this.currentTemplate);
+          this.scheduleTemplateReload(this.currentTemplate);
         }
       }, 200);
     });
 
     this.app.ticker.add((ticker) => {
+      // 先于一切 update / 本帧 render：冲刷挂起的模板重建
+      this.flushPendingTemplate();
+
       const now = performance.now();
       const dt = (now - this._lastFrameTime) / 1000;
       this._lastFrameTime = now;
@@ -237,8 +245,42 @@ export class PVEngine {
     }
   }
 
+  /**
+   * 挂起模板重建，下一帧 ticker 开头执行。
+   * resize 回调 / update 中途切模板必须走这里，禁止同步 destroy。
+   */
+  scheduleTemplateReload(
+    template: TemplateConfig,
+    opts?: { shotSwitch?: boolean; appliedSel?: string | null },
+  ): void {
+    this._pendingTemplate = template;
+    this._pendingShotSwitch = opts?.shotSwitch ?? false;
+    this._pendingShotSel = opts?.appliedSel ?? null;
+  }
+
+  private flushPendingTemplate(): void {
+    if (!this._pendingTemplate || this._loading) return;
+    const tpl = this._pendingTemplate;
+    const shotSwitch = this._pendingShotSwitch;
+    const appliedSel = this._pendingShotSel;
+    this._pendingTemplate = null;
+    this._pendingShotSwitch = false;
+    this._pendingShotSel = null;
+
+    this._shotTemplateSwitch = shotSwitch;
+    try {
+      this.loadTemplate(tpl);
+    } finally {
+      this._shotTemplateSwitch = false;
+    }
+    if (appliedSel !== null) this.onShotTemplateApplied?.(appliedSel);
+  }
+
   loadTemplate(template: TemplateConfig) {
     if (this._loading) return;
+    // 重建期间停 ticker，避免 destroy 与本帧后续 update/render 交错
+    const wasTicking = this.app.ticker.started;
+    if (wasTicking) this.app.ticker.stop();
     this._loading = true;
 
     try {
@@ -312,6 +354,7 @@ export class PVEngine {
       this.syncResolution();
     } finally {
       this._loading = false;
+      if (wasTicking) this.app.ticker.start();
     }
   }
 
@@ -1090,7 +1133,12 @@ export class PVEngine {
     this.activeEffects = [];
     for (const [key, layer] of this.layers) {
       if (key !== 'media' && layer.children.length > 0) {
-        try { layer.removeChildren().forEach(c => c.destroy()); } catch { /* safe */ }
+        try {
+          layer.removeChildren().forEach(c => {
+            detachFiltersDeep(c);
+            c.destroy({ children: true });
+          });
+        } catch { /* safe */ }
       }
     }
   }
@@ -1126,15 +1174,9 @@ export class PVEngine {
     if (sel === null || sel === this._activeShotTemplateSel) return;
     const config = this.templateResolver(sel);
     if (!config) return;
+    // 占位，避免每帧重复排队；真正 load 延到下一帧 ticker 开头
     this._activeShotTemplateSel = sel;
-    // 逐句切换不能让模板快照里的 shots 覆盖当前分镜列表
-    this._shotTemplateSwitch = true;
-    try {
-      this.loadTemplate(config);
-    } finally {
-      this._shotTemplateSwitch = false;
-    }
-    this.onShotTemplateApplied?.(sel);
+    this.scheduleTemplateReload(config, { shotSwitch: true, appliedSel: sel });
   }
   private _shotTemplateSwitch = false;
 

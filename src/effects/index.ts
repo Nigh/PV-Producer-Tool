@@ -183,4 +183,4 @@ export function createEffect(
   return effect;
 }
 
-export { BaseEffect };
+export { BaseEffect, detachFiltersDeep } from './base';

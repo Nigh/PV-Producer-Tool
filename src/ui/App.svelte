@@ -35,11 +35,6 @@
   onMount(() => {
     initApp(container);
 
-    // 画布区域尺寸变化时通知 PIXI ResizePlugin（它只监听 window resize）。
-    // ponytail: 用合成 resize 事件代替给引擎加 resize API，侧栏显隐/折叠即时生效。
-    const ro = new ResizeObserver(() => window.dispatchEvent(new Event('resize')));
-    ro.observe(container);
-
     // 全局快捷键（输入框聚焦或弹窗打开时忽略）
     const onKeydown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
@@ -67,7 +62,6 @@
     document.addEventListener('keydown', onKeydown);
     return () => {
       document.removeEventListener('keydown', onKeydown);
-      ro.disconnect();
     };
   });
 </script>

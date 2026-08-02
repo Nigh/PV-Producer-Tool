@@ -22,9 +22,37 @@ body {
 }
 
 #pv-container {
-  width: 100%;
-  height: 100%;
   position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+.stage-viewport {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
+  background: #000;
+}
+
+/* contain：在 stage 内按画幅 letterbox / pillarbox */
+.pv-frame[data-aspect='16:9'] {
+  aspect-ratio: 16 / 9;
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  height: auto;
+}
+
+.pv-frame[data-aspect='9:16'] {
+  aspect-ratio: 9 / 16;
+  width: min(100cqw, calc(100cqh * 9 / 16));
+  height: auto;
+}
+
+.pv-frame canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* ─── Sidebar layout ─── */

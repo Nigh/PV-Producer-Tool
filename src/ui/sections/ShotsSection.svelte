@@ -3,13 +3,17 @@
 <script lang="ts">
   import { t } from '../../i18n';
   import type { Shot, ShotRect, ShotTransition, ShotMotion } from '../../core/types';
-  import { ui, engine, setShots, padShots } from '../store.svelte';
+  import {
+    ui, engine, setShots, padShots, fullFrameShotRect,
+  } from '../store.svelte';
+  import {
+    canvasAspect, shotNormAspect, aspectRectFromDrag, aspectRectFromResize, refitRectToAspect,
+  } from '../../core/shotAspect';
   import Slider from '../Slider.svelte';
 
   const TRANSITIONS: ShotTransition[] = ['cut', 'fade', 'slide', 'zoom'];
   const MOTIONS: ShotMotion[] = ['none', 'zoomIn', 'zoomOut', 'panLeft', 'panRight', 'panUp', 'panDown'];
   const MIN_SIZE = 0.05;
-  const FULL_FRAME: Shot = { rect: { x: 0, y: 0, w: 1, h: 1 }, in: 'fade', out: 'fade', motion: 'none' };
 
   let selected = $state(0);
 
@@ -27,6 +31,15 @@
   });
 
   const currentShot = $derived(ui.shots[selected] ?? null);
+
+  const normAsp = $derived.by(() => {
+    void ui.aspectRatio;
+    void ui.mediaLoaded;
+    const img = engine.sourceImage;
+    const asp = canvasAspect(ui.aspectRatio);
+    if (!img) return asp;
+    return shotNormAspect(asp, img.naturalWidth, img.naturalHeight);
+  });
 
   // 歌词行数变化时补齐 shots 槽位，保证每句都有可编辑索引
   $effect(() => {
@@ -69,7 +82,8 @@
     };
   }
 
-  function clampRect(r: ShotRect): ShotRect {
+  function clampMove(r: ShotRect): ShotRect {
+    // 移动只夹位置，比例已由绘制/缩放保证
     const w = Math.min(1, Math.max(MIN_SIZE, r.w));
     const h = Math.min(1, Math.max(MIN_SIZE, r.h));
     return {
@@ -100,7 +114,7 @@
     } else {
       dragMode = 'draw';
       dragAnchor = p;
-      draftRect = { x: p.x, y: p.y, w: MIN_SIZE, h: MIN_SIZE };
+      draftRect = aspectRectFromDrag(p.x, p.y, p.x + MIN_SIZE, p.y + MIN_SIZE, normAsp, MIN_SIZE);
     }
   }
 
@@ -108,26 +122,17 @@
     if (!dragMode) return;
     const p = toNorm(e);
     if (dragMode === 'draw') {
-      draftRect = clampRect({
-        x: Math.min(dragAnchor.x, p.x),
-        y: Math.min(dragAnchor.y, p.y),
-        w: Math.abs(p.x - dragAnchor.x),
-        h: Math.abs(p.y - dragAnchor.y),
-      });
+      draftRect = aspectRectFromDrag(dragAnchor.x, dragAnchor.y, p.x, p.y, normAsp, MIN_SIZE);
     } else if (dragMode === 'move' && dragBase) {
-      draftRect = clampRect({ ...dragBase, x: p.x - dragAnchor.x, y: p.y - dragAnchor.y });
+      draftRect = clampMove({ ...dragBase, x: p.x - dragAnchor.x, y: p.y - dragAnchor.y });
     } else if (dragMode === 'resize' && dragBase) {
-      draftRect = clampRect({
-        ...dragBase,
-        w: p.x - dragBase.x,
-        h: p.y - dragBase.y,
-      });
+      draftRect = aspectRectFromResize(dragBase, p.x, p.y, normAsp, MIN_SIZE);
     }
   }
 
   function onPointerUp() {
     if (dragMode && draftRect) {
-      commitRect(draftRect);
+      commitRect(refitRectToAspect(draftRect, normAsp));
     }
     dragMode = null;
     dragBase = null;
@@ -159,16 +164,17 @@
     const shots = padShots(ui.shots, lines.length);
     const prev = shots.slice(0, selected).reverse().find((s) => !!s);
     if (!prev) return;
-    shots[selected] = { ...prev, rect: { ...prev.rect } };
+    shots[selected] = { ...prev, rect: refitRectToAspect({ ...prev.rect }, normAsp) };
     setShots(shots);
   }
 
   function fillUnsetFullFrame() {
     const shots = padShots(ui.shots, lines.length);
+    const rect = fullFrameShotRect();
     let changed = false;
     for (let i = 0; i < shots.length; i++) {
       if (!shots[i]) {
-        shots[i] = { ...FULL_FRAME, rect: { ...FULL_FRAME.rect } };
+        shots[i] = { rect: { ...rect }, in: 'fade', out: 'fade', motion: 'none' };
         changed = true;
       }
     }

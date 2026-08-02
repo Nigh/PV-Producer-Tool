@@ -17,6 +17,7 @@
   const REPO_URL = 'https://github.com/Nigh/PV-Producer-Tool';
 
   const SECTIONS = [
+    { id: 'settings', title: t('nav_settings'), sub: t('nav_settings_sub'), component: SettingsSection },
     { id: 'template', title: t('nav_template'), sub: t('nav_template_sub'), component: TemplateSection },
     { id: 'playback', title: t('nav_playback'), sub: t('nav_playback_sub'), component: PlaybackSection },
     { id: 'shots', title: t('nav_shots'), sub: t('nav_shots_sub'), component: ShotsSection },
@@ -24,7 +25,6 @@
     { id: 'effects', title: t('nav_effects'), sub: t('nav_effects_sub'), component: EffectsSection },
     { id: 'ai', title: t('nav_ai'), sub: t('nav_ai_sub'), component: AiSection },
     { id: 'export', title: t('nav_export'), sub: t('nav_export_sub'), component: ExportSection },
-    { id: 'settings', title: t('nav_settings'), sub: t('nav_settings_sub'), component: SettingsSection },
   ] as const;
 
   let container: HTMLDivElement;
@@ -108,19 +108,26 @@
   {/if}
 
   <main class="stage">
-    <div id="pv-container" bind:this={container}>
-      {#if ui.aiLoading}
-        <div class="ai-loader-overlay">
-          <div class="ai-loader-dots"></div>
-          <div class="ai-loader-halo-wrapper">
-            <div class="ai-loader-halo"></div>
-            <div class="ai-loader-halo" style="animation-delay: 1.25s;"></div>
+    <div class="stage-viewport">
+      <div
+        id="pv-container"
+        class="pv-frame"
+        data-aspect={ui.aspectRatio}
+        bind:this={container}
+      >
+        {#if ui.aiLoading}
+          <div class="ai-loader-overlay">
+            <div class="ai-loader-dots"></div>
+            <div class="ai-loader-halo-wrapper">
+              <div class="ai-loader-halo"></div>
+              <div class="ai-loader-halo" style="animation-delay: 1.25s;"></div>
+            </div>
+            <div class="ai-loader-content">
+              <div class="ai-loader-text">{t('ai_conceiving')}</div>
+            </div>
           </div>
-          <div class="ai-loader-content">
-            <div class="ai-loader-text">{t('ai_conceiving')}</div>
-          </div>
-        </div>
-      {/if}
+        {/if}
+      </div>
     </div>
 
     <footer class="pv-footer">

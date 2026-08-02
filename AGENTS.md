@@ -19,8 +19,8 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 - `src/ui/` — Svelte UI layer:
   - `store.svelte.ts` — runes state (`ui`), the `PVEngine` instance, and all template-management actions (select/save/delete/share-code/AI-generate/URL-param init). The single source of truth for UI↔engine sync.
   - `App.svelte` — left-sidebar navigation shell (nav rail + active section), engine mount, H-key hide-all, AI loader overlay, footer. Mobile: sidebar becomes an overlay drawer.
-  - `sections/` — one component per nav section: Template, Playback (text/media/audio/timeline), Shots (still-image MAD shot editor: drag-to-frame on a thumbnail, per-line in/out transitions + Ken Burns motion), PostFx, Effects (grid; toggling while a preset is active auto-switches to Custom), Ai, Export, Settings (canvas color/font/FPS/theme/NP-listen).
-  - `theme.svelte.ts` — xianii / xianii-light theme switch persisted in localStorage.
+  - `sections/` — one component per nav section (Settings first): Settings (aspect 16:9|9:16, BPM + beat offset 0–1, beat react, canvas color/font/FPS/theme/NP-listen), Template, Playback (timestamped LRC only, audio, 曲绘/illustration, timeline), Shots (still-image MAD shot editor: aspect-locked drag-to-frame per lyric line + Ken Burns), PostFx, Effects (grid; toggling while a preset is active auto-switches to Custom), Ai, Export.
+  - `theme.svelte.ts` — xianii / xianii-light theme switch persisted in localStorage; aspect ratio and beat offset also persist there.
   - `recorder.svelte.ts` — MediaRecorder + PNG-sequence (alpha) export. `copyUrl.ts` — copy-URL modal.
   - `Slider.svelte` — labeled range control.
 - `src/app.css` — Tailwind + design-system import + residual global styles (panel layout, toast/modal, AI loader).
@@ -31,8 +31,9 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
   - `aiService.ts` — AI template generation via OpenAI-compatible `/v1/chat/completions`; user supplies base URL + API key at runtime (never hardcode keys). `EFFECT_SKILLS` maps effect ids to Chinese semantic descriptions for the LLM.
   - `templateStore.ts` — custom templates in `localStorage` + share-code encode/decode (JSON+deflate — new optional `TemplateConfig` fields like `shots` pass through automatically, backward compatible).
   - `shotMath.ts` — pure, time-parametric shot-view math (cover framing, Ken Burns motion, in/out transitions); seek-safe by construction, covered by `tests/shotMath.check.ts`.
+  - `shotAspect.ts` — canvas aspect ↔ normalized shot-rect helpers (locked framing for 16:9 / 9:16).
   - `shotCamera.ts` — `ShotCamera`: crops per-shot textures from the full-resolution source image (lazy + cached, margin-expanded), dual-sprite crossfade between shots. Engine keeps `sourceImage` at full resolution; the base media texture is downscaled to the queried GPU max texture size (capped 8192).
-  - `beatProvider.ts`, `motionDetector.ts`, `nowPlayingProvider.ts`, `colorExtractor.ts`, `lrc.ts`, `srtParser.ts`, `ccl.ts` (connected-component labeling for glyph shattering).
+  - `beatProvider.ts` — BPM metronome + beatOffset (0–1 beats) drives `beatIntensity` from playback time (not audio-energy onset); also owns optional audio element clock. Also: `motionDetector.ts`, `nowPlayingProvider.ts`, `colorExtractor.ts`, `lrc.ts`, `srtParser.ts`, `ccl.ts` (connected-component labeling for glyph shattering).
 - `src/effects/` — one file per effect (~100 files). All extend `BaseEffect` (`base.ts`): `init() → setup()`, `update(ctx)`, `destroy()`; set `heavy = true` for GPU/CPU-costly effects so the engine can frame-skip. Effects are registered by string id in `src/effects/index.ts` (`register()` / `createEffect()`).
 - `src/templates/` — preset `TemplateConfig`s (effect id + config lists), aggregated in `src/templates/index.ts`.
 - `src/i18n/` — `zh.ts` (source of truth for `LocaleKey`), `en.ts`, `ja.ts`, `t()` helper. New UI strings need all three locales.
@@ -47,6 +48,7 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 
 ## 5) Known Facts / Gotchas
 
+- Preview stage letterboxes into a fixed 16:9 or 9:16 `#pv-container` frame; PIXI `resizeTo` that frame so export matches the chosen aspect. Lyrics require timestamped LRC (no `/` text split).
 - `src/core/` must stay framework-free (no Svelte imports); UI state belongs in `src/ui/store.svelte.ts`.
 - `tsconfig` has `noUnusedLocals`/`noUnusedParameters` — dead code fails the build.
 - Effects must clean up in `destroy()`; `BaseEffect.destroy()` handles the container tree, but external resources (video elements, intervals, canvases) are the effect's responsibility.

@@ -9,6 +9,9 @@ import {
   coverScale, expandRect, ease, evalMotion, evalTransition,
   transitionWindow, computeShotView,
 } from '../src/core/shotMath.ts';
+import {
+  canvasAspect, shotNormAspect, maxCenteredRect, refitRectToAspect, aspectRectFromDrag,
+} from '../src/core/shotAspect.ts';
 
 // ── coverScale：cover 语义 = 两个方向都至少铺满 ──
 assert.equal(coverScale(1000, 1000, 1920, 1080), 1.92);
@@ -155,6 +158,27 @@ assert.equal(transitionWindow(10), 0.6);
     motion: 'panRight', inType: 'cut', outType: 'cut', t: 4, duration: 4,
   });
   assert.ok(panned.x < base.x);
+}
+
+// ── shotAspect：画幅锁定矩形 ──
+assert.equal(canvasAspect('16:9'), 16 / 9);
+assert.equal(canvasAspect('9:16'), 9 / 16);
+{
+  // 正方形原图 + 16:9 画布 → 归一化框 w/h = 16/9
+  const na = shotNormAspect(16 / 9, 1000, 1000);
+  assert.ok(Math.abs(na - 16 / 9) < 1e-9);
+  const full = maxCenteredRect(na);
+  assert.ok(Math.abs(full.w / full.h - na) < 1e-9);
+  assert.ok(full.w <= 1 + 1e-9 && full.h <= 1 + 1e-9);
+}
+{
+  const r = refitRectToAspect({ x: 0.1, y: 0.1, w: 0.5, h: 0.5 }, 16 / 9);
+  assert.ok(Math.abs(r.w / r.h - 16 / 9) < 1e-6);
+  assert.ok(r.x >= -1e-9 && r.y >= -1e-9 && r.x + r.w <= 1 + 1e-9);
+}
+{
+  const d = aspectRectFromDrag(0.2, 0.2, 0.6, 0.3, 16 / 9, 0.05);
+  assert.ok(Math.abs(d.w / d.h - 16 / 9) < 1e-6);
 }
 
 console.log('shotMath.check: all assertions passed');

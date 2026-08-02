@@ -1111,7 +1111,7 @@ export class PVEngine {
       motionIntensity: this._motionIntensity,
       currentText: this.getDisplayText(lyricClock),
       segmentTime: this.getSegmentTime(lyricClock),
-      beatIntensity: this.beat.getIntensity(time) * this._beatReactivity,
+      beatIntensity: this.beat.getIntensity(lyricClock) * this._beatReactivity,
       motionTargets: this.motionTargets,
     };
 
@@ -1124,7 +1124,7 @@ export class PVEngine {
     }
 
     this.updateBgFill();
-    this.applyCameraFX(time);
+    this.applyCameraFX(lyricClock);
 
     if (this.outlineRenderer && this.mediaElement) {
       this.outlineRenderer.update(this.mediaElement as HTMLVideoElement);

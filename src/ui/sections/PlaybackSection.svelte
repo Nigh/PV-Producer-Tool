@@ -10,7 +10,7 @@
   let isSeeking = $state(false);
   let pendingFile: File | null = $state(null);
 
-  // ── 文本输入（防抖应用）──
+  // ── LRC 文本（防抖应用）──
   let textTimer: ReturnType<typeof setTimeout>;
   function onTextInput() {
     clearTimeout(textTimer);
@@ -29,7 +29,7 @@
     lrcInput.value = '';
   }
 
-  // ── 媒体 ──
+  // ── 曲绘 ──
   let mediaInput: HTMLInputElement;
   function onMediaChange() {
     const file = mediaInput.files?.[0];
@@ -135,7 +135,7 @@
     id="text-input"
     class="textarea textarea-sm w-full"
     rows={textExpanded ? 6 : 3}
-    placeholder="深夜東京/の6畳半夢"
+    placeholder={'[00:00.00]深夜東京\n[00:03.00]の6畳半夢'}
     bind:value={ui.text}
     oninput={onTextInput}
     onfocus={() => { textExpanded = true; }}
@@ -191,11 +191,6 @@
 {/if}
 
 <Slider
-  label={t('seg_duration')} display={`${ui.segDuration.toFixed(1)}s`}
-  min={1} max={10} step={0.5} bind:value={ui.segDuration}
-  oninput={() => { engine.segmentDuration = ui.segDuration; }}
-/>
-<Slider
   label={t('anim_speed')} display={`${ui.speed.toFixed(1)}x`}
   min={0} max={4} step={0.1} bind:value={ui.speed}
   oninput={() => { engine.animationSpeed = ui.speed; }}
@@ -209,14 +204,4 @@
   label={t('bg_opacity')} display={`${Math.round(ui.opacity * 100)}%`}
   min={0} max={1} step={0.05} bind:value={ui.opacity}
   oninput={() => { engine.effectOpacity = ui.opacity; }}
-/>
-<Slider
-  label={t('bpm')} display={String(ui.bpm)}
-  min={30} max={240} step={1} bind:value={ui.bpm}
-  oninput={() => { engine.beat.bpm = ui.bpm; }}
-/>
-<Slider
-  label={t('beat_react')} display={ui.beatReact.toFixed(2)}
-  min={0} max={1} step={0.05} bind:value={ui.beatReact}
-  oninput={() => { engine.beatReactivity = ui.beatReact; }}
 />

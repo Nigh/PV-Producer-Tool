@@ -12,7 +12,7 @@ import { PVEngine } from '../core/engine';
 import { parseLrc } from '../core/lrc';
 import { templates } from '../templates';
 import { effectCatalog } from '../core/effectCatalog';
-import type { TemplateConfig, Shot } from '../core/types';
+import type { TemplateConfig, Shot, ShotRect } from '../core/types';
 import { t } from '../i18n';
 import {
   loadCustomTemplates,
@@ -23,11 +23,30 @@ import {
 import { generateConfigFromAI } from '../core/aiService';
 import { testNowPlayingConnection } from '../core/nowPlayingProvider';
 import { showToast } from '../core/uiHelpers';
+import type { AspectRatio } from '../core/shotAspect';
+import { canvasAspect, maxCenteredRect, refitRectToAspect, shotNormAspect } from '../core/shotAspect';
 
 export const engine = new PVEngine();
 
-export const DEFAULT_TEXT =
-  '深夜東京/の6畳半夢/を見てた/灯りの灯らない蛍光灯/明日には消えてる電脳城/に/開幕戦/打ち上げて/いなくなんないよね/ここには誰もいない/ここには誰もいないから';
+/** 默认示例 LRC（必须带时间戳）。 */
+export const DEFAULT_TEXT = `[00:00.00]深夜東京
+[00:03.00]の6畳半夢
+[00:06.00]を見てた
+[00:09.00]灯りの灯らない蛍光灯
+[00:12.00]明日には消えてる電脳城`;
+
+const ASPECT_KEY = 'pv-tool-aspect';
+const BEAT_OFFSET_KEY = 'pv-tool-beat-offset';
+
+function loadAspect(): AspectRatio {
+  const v = localStorage.getItem(ASPECT_KEY);
+  return v === '9:16' ? '9:16' : '16:9';
+}
+
+function loadBeatOffset(): number {
+  const n = Number(localStorage.getItem(BEAT_OFFSET_KEY));
+  return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0;
+}
 
 export function tplName(tpl: TemplateConfig): string {
   return tpl.nameKey ? t(tpl.nameKey as any) : tpl.name;
@@ -41,12 +60,13 @@ export const ui = $state({
   checkedEffects: effectCatalog.map(() => false),
 
   // 运行参数（与引擎 setter 双向同步）
-  segDuration: 3,
   speed: 2,
   motion: 1,
   opacity: 1,
   bpm: 120,
+  beatOffset: loadBeatOffset(),
   beatReact: 0.5,
+  aspectRatio: loadAspect() as AspectRatio,
   fps: 0,
   fpsActual: 0,
   shake: 0,
@@ -136,6 +156,38 @@ export function padShots(shots: (Shot | null)[], len: number): (Shot | null)[] {
 export function setShots(shots: (Shot | null)[]): void {
   ui.shots = shots;
   engine.setShots(cloneJson($state.snapshot(shots)) as (Shot | null)[]);
+}
+
+export function setAspectRatio(ar: AspectRatio): void {
+  if (ui.aspectRatio === ar) return;
+  ui.aspectRatio = ar;
+  localStorage.setItem(ASPECT_KEY, ar);
+  // 已有分镜按中心重算比例，避免自由框残留
+  const img = engine.sourceImage;
+  if (img && ui.shots.some((s) => !!s)) {
+    const normAsp = shotNormAspect(canvasAspect(ar), img.naturalWidth, img.naturalHeight);
+    const next = ui.shots.map((s) =>
+      s ? { ...s, rect: refitRectToAspect(s.rect, normAsp) } : null,
+    );
+    setShots(next);
+  }
+  // PIXI resizeTo 依赖容器尺寸；画幅 class 变更后补一次
+  requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+}
+
+export function setBeatOffset(val: number): void {
+  const v = Math.max(0, Math.min(1, val));
+  ui.beatOffset = v;
+  engine.beat.beatOffset = v;
+  localStorage.setItem(BEAT_OFFSET_KEY, String(v));
+}
+
+/** 当前画幅下，原图内最大居中取景框。 */
+export function fullFrameShotRect(): ShotRect {
+  const img = engine.sourceImage;
+  const asp = canvasAspect(ui.aspectRatio);
+  if (!img) return maxCenteredRect(asp);
+  return maxCenteredRect(shotNormAspect(asp, img.naturalWidth, img.naturalHeight));
 }
 
 /**
@@ -230,22 +282,25 @@ function configFor(val: string): TemplateConfig | null {
 
 const syncChannel = new BroadcastChannel('pv-tool-sync');
 
-/** 模板切换入口（下拉框、按钮网格、URL 参数、跨窗口同步共用）。 */
+/** 模板切换入口（模板管理、URL 参数、跨窗口同步共用）。 */
 export function selectTemplate(val: string, broadcast = true): void {
   if (val === 'custom') {
     ui.selected = 'custom';
     engine.loadTemplate(buildCustomTemplate());
+    engine.resetShotTemplateTracking('custom');
   } else {
     const config = configFor(val);
     if (!config) {
       ui.selected = '0';
       engine.loadTemplate(templates[0]);
+      engine.resetShotTemplateTracking('0');
       syncCheckedEffects(templates[0]);
       syncFromEngine();
       return;
     }
     ui.selected = val;
     engine.loadTemplate(config);
+    engine.resetShotTemplateTracking(val);
     syncCheckedEffects(config);
     syncFromEngine();
   }
@@ -329,17 +384,18 @@ export async function importShareCode(code: string): Promise<void> {
   selectTemplate(`user-${ui.customTemplates.length - 1}`);
 }
 
-/** 文本输入应用：带时间戳按 LRC 解析，否则按 `/` 分段纯文本。 */
-export function applyTextInput(rawText: string): void {
+/** 文本输入应用：仅接受带时间戳的 LRC。 */
+export function applyTextInput(rawText: string): boolean {
   const hasTimestamps = /\[\d{1,2}:\d{2}/.test(rawText);
   if (hasTimestamps) {
     const parsed = parseLrc(rawText);
     if (parsed.length > 0) {
       engine.setLyricTimeline(parsed);
-      return;
+      return true;
     }
   }
-  engine.setText(rawText.replace(/\r?\n/g, '/'));
+  showToast(t('lrc_required'));
+  return false;
 }
 
 /** AI 生成模板并保存为用户模板。 */
@@ -389,7 +445,16 @@ export async function toggleNowPlaying(on: boolean): Promise<boolean> {
 /** 引擎初始化 + URL 参数恢复。App.svelte onMount 调用一次。 */
 export async function initApp(container: HTMLElement): Promise<void> {
   await engine.init(container);
-  engine.setText(DEFAULT_TEXT);
+  engine.beat.beatOffset = ui.beatOffset;
+  // 逐句模板：引擎按分镜切换模板时经这里解析选择值并回写 UI 状态
+  engine.templateResolver = (sel) => configFor(sel);
+  engine.onShotTemplateApplied = (sel) => {
+    ui.selected = sel;
+    const config = configFor(sel);
+    if (config) syncCheckedEffects(config);
+    syncFromEngine();
+  };
+  applyTextInput(DEFAULT_TEXT);
   engine.onFpsUpdate = (fps) => { ui.fpsActual = fps; };
 
   const urlParams = new URLSearchParams(window.location.search);

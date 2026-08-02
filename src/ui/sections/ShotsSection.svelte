@@ -2,14 +2,20 @@
      Licensed under Non-Commercial License. See LICENSE for terms. -->
 <script lang="ts">
   import { t } from '../../i18n';
+  import { templates } from '../../templates';
   import type { Shot, ShotRect, ShotTransition, ShotMotion } from '../../core/types';
-  import { ui, engine, setShots, padShots } from '../store.svelte';
+  import {
+    ui, engine, setShots, padShots, fullFrameShotRect, tplName,
+  } from '../store.svelte';
+  import {
+    canvasAspect, shotNormAspect, aspectRectFromDrag, aspectRectFromResize, refitRectToAspect,
+  } from '../../core/shotAspect';
   import Slider from '../Slider.svelte';
+  import TemplateSection from './TemplateSection.svelte';
 
   const TRANSITIONS: ShotTransition[] = ['cut', 'fade', 'slide', 'zoom'];
   const MOTIONS: ShotMotion[] = ['none', 'zoomIn', 'zoomOut', 'panLeft', 'panRight', 'panUp', 'panDown'];
   const MIN_SIZE = 0.05;
-  const FULL_FRAME: Shot = { rect: { x: 0, y: 0, w: 1, h: 1 }, in: 'fade', out: 'fade', motion: 'none' };
 
   let selected = $state(0);
 
@@ -27,6 +33,15 @@
   });
 
   const currentShot = $derived(ui.shots[selected] ?? null);
+
+  const normAsp = $derived.by(() => {
+    void ui.aspectRatio;
+    void ui.mediaLoaded;
+    const img = engine.sourceImage;
+    const asp = canvasAspect(ui.aspectRatio);
+    if (!img) return asp;
+    return shotNormAspect(asp, img.naturalWidth, img.naturalHeight);
+  });
 
   // 歌词行数变化时补齐 shots 槽位，保证每句都有可编辑索引
   $effect(() => {
@@ -69,7 +84,8 @@
     };
   }
 
-  function clampRect(r: ShotRect): ShotRect {
+  function clampMove(r: ShotRect): ShotRect {
+    // 移动只夹位置，比例已由绘制/缩放保证
     const w = Math.min(1, Math.max(MIN_SIZE, r.w));
     const h = Math.min(1, Math.max(MIN_SIZE, r.h));
     return {
@@ -100,7 +116,7 @@
     } else {
       dragMode = 'draw';
       dragAnchor = p;
-      draftRect = { x: p.x, y: p.y, w: MIN_SIZE, h: MIN_SIZE };
+      draftRect = aspectRectFromDrag(p.x, p.y, p.x + MIN_SIZE, p.y + MIN_SIZE, normAsp, MIN_SIZE);
     }
   }
 
@@ -108,26 +124,17 @@
     if (!dragMode) return;
     const p = toNorm(e);
     if (dragMode === 'draw') {
-      draftRect = clampRect({
-        x: Math.min(dragAnchor.x, p.x),
-        y: Math.min(dragAnchor.y, p.y),
-        w: Math.abs(p.x - dragAnchor.x),
-        h: Math.abs(p.y - dragAnchor.y),
-      });
+      draftRect = aspectRectFromDrag(dragAnchor.x, dragAnchor.y, p.x, p.y, normAsp, MIN_SIZE);
     } else if (dragMode === 'move' && dragBase) {
-      draftRect = clampRect({ ...dragBase, x: p.x - dragAnchor.x, y: p.y - dragAnchor.y });
+      draftRect = clampMove({ ...dragBase, x: p.x - dragAnchor.x, y: p.y - dragAnchor.y });
     } else if (dragMode === 'resize' && dragBase) {
-      draftRect = clampRect({
-        ...dragBase,
-        w: p.x - dragBase.x,
-        h: p.y - dragBase.y,
-      });
+      draftRect = aspectRectFromResize(dragBase, p.x, p.y, normAsp, MIN_SIZE);
     }
   }
 
   function onPointerUp() {
     if (dragMode && draftRect) {
-      commitRect(draftRect);
+      commitRect(refitRectToAspect(draftRect, normAsp));
     }
     dragMode = null;
     dragBase = null;
@@ -159,16 +166,63 @@
     const shots = padShots(ui.shots, lines.length);
     const prev = shots.slice(0, selected).reverse().find((s) => !!s);
     if (!prev) return;
-    shots[selected] = { ...prev, rect: { ...prev.rect } };
+    // 复制完整分镜：取景框 + 转场 + 模板 + 参数覆盖
+    shots[selected] = { ...prev, rect: refitRectToAspect({ ...prev.rect }, normAsp) };
+    setShots(shots);
+  }
+
+  // ── 逐句模板 / 参数覆盖 ──
+  const templateOptions = $derived([
+    ...templates.map((tp, i) => ({ value: String(i), label: tplName(tp) })),
+    ...ui.customTemplates.map((tp, i) => ({ value: `user-${i}`, label: `⭐ ${tp.name}` })),
+    ...(ui.sharedTemplate ? [{ value: 'shared', label: `↗ ${ui.sharedTemplate.name}` }] : []),
+  ]);
+
+  function onShotTemplateChange(e: Event) {
+    const v = (e.currentTarget as HTMLSelectElement).value;
+    if (!currentShot) return;
+    const shots = padShots(ui.shots, lines.length);
+    const next = { ...currentShot };
+    if (v === '') delete next.template; else next.template = v;
+    shots[selected] = next;
+    setShots(shots);
+    engine.resetShotTemplateTracking();
+    previewLine(selected);
+  }
+
+  // 滑条需要具体数值：未覆盖时显示全局值，拖动即写入覆盖
+  let ovSpeed = $state(1);
+  let ovMotion = $state(1);
+  let ovOpacity = $state(1);
+  $effect(() => {
+    ovSpeed = currentShot?.animationSpeed ?? ui.speed;
+    ovMotion = currentShot?.motionIntensity ?? ui.motion;
+    ovOpacity = currentShot?.bgOpacity ?? ui.opacity;
+  });
+
+  function setOverride(patch: Partial<Shot>) {
+    if (!currentShot) return;
+    updateShot(patch);
+  }
+
+  function resetOverrides() {
+    if (!currentShot) return;
+    const shots = padShots(ui.shots, lines.length);
+    const next = { ...currentShot };
+    delete next.animationSpeed;
+    delete next.motionIntensity;
+    delete next.bgOpacity;
+    shots[selected] = next;
     setShots(shots);
   }
 
   function fillUnsetFullFrame() {
     const shots = padShots(ui.shots, lines.length);
+    const rect = fullFrameShotRect();
     let changed = false;
     for (let i = 0; i < shots.length; i++) {
       if (!shots[i]) {
-        shots[i] = { ...FULL_FRAME, rect: { ...FULL_FRAME.rect } };
+        shots[i] = { rect: { ...rect }, in: 'fade', out: 'fade', motion: 'none' };
         changed = true;
       }
     }
@@ -189,12 +243,6 @@
   <p class="shots-empty">{t('shots_need_image')}</p>
 {:else}
   <p class="shots-empty">{t('shot_hint')}</p>
-
-  <Slider
-    label={t('bg_opacity')} display={`${Math.round(ui.opacity * 100)}%`}
-    min={0} max={1} step={0.05} bind:value={ui.opacity}
-    oninput={() => { engine.effectOpacity = ui.opacity; }}
-  />
 
   <div
     class="shot-frame"
@@ -259,8 +307,35 @@
           </select>
         </label>
       </div>
+      <label class="shot-opt">
+        <span>{t('shot_template')}</span>
+        <select class="select select-xs" value={currentShot.template ?? ''} onchange={onShotTemplateChange}>
+          <option value="">{t('shot_tpl_inherit')}</option>
+          {#each templateOptions as opt (opt.value)}
+            <option value={opt.value}>{opt.label}</option>
+          {/each}
+        </select>
+      </label>
+
+      <Slider
+        label={t('anim_speed')} display={`${ovSpeed.toFixed(1)}x${currentShot.animationSpeed === undefined ? ` (${t('shot_follow_global')})` : ''}`}
+        min={0} max={4} step={0.1} bind:value={ovSpeed}
+        oninput={() => setOverride({ animationSpeed: ovSpeed })}
+      />
+      <Slider
+        label={t('motion_intensity')} display={`${ovMotion.toFixed(1)}x${currentShot.motionIntensity === undefined ? ` (${t('shot_follow_global')})` : ''}`}
+        min={0} max={2} step={0.1} bind:value={ovMotion}
+        oninput={() => setOverride({ motionIntensity: ovMotion })}
+      />
+      <Slider
+        label={t('bg_opacity')} display={`${Math.round(ovOpacity * 100)}%${currentShot.bgOpacity === undefined ? ` (${t('shot_follow_global')})` : ''}`}
+        min={0} max={1} step={0.05} bind:value={ovOpacity}
+        oninput={() => setOverride({ bgOpacity: ovOpacity })}
+      />
+
       <div class="template-actions">
         <button class="btn btn-xs" onclick={() => previewLine(selected)}>{t('shot_preview')}</button>
+        <button class="btn btn-xs" onclick={resetOverrides}>{t('shot_reset_overrides')}</button>
         <button class="btn btn-xs btn-error" onclick={clearShot}>{t('shot_clear')}</button>
       </div>
     </div>
@@ -282,3 +357,8 @@
     {/each}
   </ul>
 {/if}
+
+<details class="collapsible-section">
+  <summary class="panel-title">{t('shot_tpl_manage')}</summary>
+  <TemplateSection />
+</details>

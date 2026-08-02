@@ -4,8 +4,10 @@
   import { onMount } from 'svelte';
   import { t, locale } from '../../i18n';
   import { showToast, showModal } from '../../core/uiHelpers';
-  import { ui, engine, toggleNowPlaying } from '../store.svelte';
+  import { ui, engine, toggleNowPlaying, setAspectRatio, setBeatOffset } from '../store.svelte';
+  import type { AspectRatio } from '../../core/shotAspect';
   import { theme, setTheme } from '../theme.svelte';
+  import Slider from '../Slider.svelte';
 
   const SWATCHES = [
     { color: '#ffffff', key: 'white' },
@@ -71,6 +73,10 @@
       );
     }
   }
+
+  function onAspectChange(e: Event) {
+    setAspectRatio((e.currentTarget as HTMLSelectElement).value as AspectRatio);
+  }
 </script>
 
 <div class="control-group">
@@ -82,6 +88,14 @@
     />
     <span>{t('theme_light')}</span>
   </label>
+</div>
+
+<div class="control-group">
+  <label for="aspect-select">{t('aspect_ratio')}</label>
+  <select id="aspect-select" class="select select-sm w-full" value={ui.aspectRatio} onchange={onAspectChange}>
+    <option value="16:9">{t('aspect_16_9')}</option>
+    <option value="9:16">{t('aspect_9_16')}</option>
+  </select>
 </div>
 
 <div class="control-group">
@@ -133,6 +147,22 @@
     {/each}
   </select>
 </div>
+
+<Slider
+  label={t('bpm')} display={String(ui.bpm)}
+  min={30} max={240} step={1} bind:value={ui.bpm}
+  oninput={() => { engine.beat.bpm = ui.bpm; }}
+/>
+<Slider
+  label={t('beat_offset')} display={`${ui.beatOffset.toFixed(2)} ${t('beat_unit')}`}
+  min={0} max={1} step={0.01} bind:value={ui.beatOffset}
+  oninput={() => setBeatOffset(ui.beatOffset)}
+/>
+<Slider
+  label={t('beat_react')} display={ui.beatReact.toFixed(2)}
+  min={0} max={1} step={0.05} bind:value={ui.beatReact}
+  oninput={() => { engine.beatReactivity = ui.beatReact; }}
+/>
 
 {#if locale === 'zh'}
   <div class="control-group">

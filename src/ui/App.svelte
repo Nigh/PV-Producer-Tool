@@ -5,8 +5,8 @@
   import { t } from '../i18n';
   import { ui, initApp } from './store.svelte';
   import './theme.svelte';
-  import TemplateSection from './sections/TemplateSection.svelte';
   import PlaybackSection from './sections/PlaybackSection.svelte';
+  import PlayerBar from './PlayerBar.svelte';
   import PostFxSection from './sections/PostFxSection.svelte';
   import ShotsSection from './sections/ShotsSection.svelte';
   import EffectsSection from './sections/EffectsSection.svelte';
@@ -17,18 +17,17 @@
   const REPO_URL = 'https://github.com/Nigh/PV-Producer-Tool';
 
   const SECTIONS = [
-    { id: 'template', title: t('nav_template'), sub: t('nav_template_sub'), component: TemplateSection },
+    { id: 'settings', title: t('nav_settings'), sub: t('nav_settings_sub'), component: SettingsSection },
     { id: 'playback', title: t('nav_playback'), sub: t('nav_playback_sub'), component: PlaybackSection },
     { id: 'shots', title: t('nav_shots'), sub: t('nav_shots_sub'), component: ShotsSection },
     { id: 'postfx', title: t('nav_postfx'), sub: t('nav_postfx_sub'), component: PostFxSection },
     { id: 'effects', title: t('nav_effects'), sub: t('nav_effects_sub'), component: EffectsSection },
     { id: 'ai', title: t('nav_ai'), sub: t('nav_ai_sub'), component: AiSection },
     { id: 'export', title: t('nav_export'), sub: t('nav_export_sub'), component: ExportSection },
-    { id: 'settings', title: t('nav_settings'), sub: t('nav_settings_sub'), component: SettingsSection },
   ] as const;
 
   let container: HTMLDivElement;
-  let active = $state<typeof SECTIONS[number]['id']>('template');
+  let active = $state<typeof SECTIONS[number]['id']>('playback');
   let sidebarOpen = $state(!window.matchMedia('(max-width: 768px)').matches);
 
   const activeSection = $derived(SECTIONS.find((s) => s.id === active)!);
@@ -108,19 +107,29 @@
   {/if}
 
   <main class="stage">
-    <div id="pv-container" bind:this={container}>
-      {#if ui.aiLoading}
-        <div class="ai-loader-overlay">
-          <div class="ai-loader-dots"></div>
-          <div class="ai-loader-halo-wrapper">
-            <div class="ai-loader-halo"></div>
-            <div class="ai-loader-halo" style="animation-delay: 1.25s;"></div>
+    <div class="stage-viewport">
+      <div class="frame-area">
+      <div
+        id="pv-container"
+        class="pv-frame"
+        data-aspect={ui.aspectRatio}
+        bind:this={container}
+      >
+        {#if ui.aiLoading}
+          <div class="ai-loader-overlay">
+            <div class="ai-loader-dots"></div>
+            <div class="ai-loader-halo-wrapper">
+              <div class="ai-loader-halo"></div>
+              <div class="ai-loader-halo" style="animation-delay: 1.25s;"></div>
+            </div>
+            <div class="ai-loader-content">
+              <div class="ai-loader-text">{t('ai_conceiving')}</div>
+            </div>
           </div>
-          <div class="ai-loader-content">
-            <div class="ai-loader-text">{t('ai_conceiving')}</div>
-          </div>
-        </div>
-      {/if}
+        {/if}
+      </div>
+      </div>
+      <PlayerBar />
     </div>
 
     <footer class="pv-footer">

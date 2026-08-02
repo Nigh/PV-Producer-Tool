@@ -529,6 +529,8 @@ textarea.textarea {
   gap: 2px;
   max-height: 40vh;
   overflow-y: auto;
+  /* 列方向 flex 容器里 overflow:auto 的子项会被压到 0 高，禁止收缩 */
+  flex-shrink: 0;
 }
 
 .shot-line {

@@ -77,8 +77,6 @@ export const ui = $state({
 
   // 媒体
   mediaName: '',
-  mediaMode: 'fit' as 'fit' | 'free',
-  mediaPicked: false,
   mediaLoaded: false,
   mediaX: 0,
   mediaY: 0,
@@ -162,7 +160,7 @@ export function setShots(shots: (Shot | null)[]): void {
   engine.setShots(cloneJson($state.snapshot(shots)) as (Shot | null)[]);
 }
 
-/** 聚焦一句歌词；singleLineEdit 开启时同时锁句内循环并跳到句中段。 */
+/** 聚焦一句歌词；singleLineEdit 开启时锁句内循环并跳到句中段，否则跳到句首。 */
 export function focusLine(index: number): void {
   ui.focusedLine = index;
   if (ui.singleLineEdit) {
@@ -172,6 +170,7 @@ export function focusLine(index: number): void {
     engine.seek(Math.max(0, start + Math.max(0, end - start) / 2));
   } else {
     engine.loopSegment = null;
+    engine.seek(engine.segmentStartTime(index));
   }
 }
 

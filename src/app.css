@@ -616,21 +616,6 @@ textarea.textarea {
   position: relative;
 }
 
-/* 与上一句同一镜：竖线连到上一行的点中心 */
-.shot-line-cont::before {
-  content: '';
-  position: absolute;
-  left: calc(6px + 3.5px);
-  top: calc(-50% - 2px);
-  height: calc(50% + 2px);
-  width: 2px;
-  margin-left: -1px;
-  background: var(--color-primary);
-  opacity: 0.55;
-  pointer-events: none;
-  z-index: 0;
-}
-
 .shot-line {
   display: flex;
   align-items: center;
@@ -655,6 +640,12 @@ textarea.textarea {
   color: var(--color-base-content);
 }
 
+/* 非单句模式：跟随进度的选中，无强调色 */
+.shot-line-current {
+  background: color-mix(in oklab, var(--color-base-content) 10%, transparent);
+  color: var(--color-base-content);
+}
+
 .shot-line-dot {
   position: relative;
   z-index: 1;
@@ -674,6 +665,20 @@ textarea.textarea {
 .shot-line-dot-inherit {
   border-color: var(--color-primary);
   background: transparent;
+}
+
+/* padding 4 + gap 2 + padding 4 = 10px between adjacent 7px dots */
+.shot-line-dot-cont::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 10px;
+  background: var(--color-primary);
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .shot-line-idx {

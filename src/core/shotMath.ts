@@ -109,6 +109,58 @@ export function evalTransition(
   return { pIn, pOut, alpha, slideX, zoomBoost };
 }
 
+/**
+ * 出场转场解析：沿用同镜或切到下一镜时禁止 fade-out 透底
+ *（透出画布背景色）；真正的叠化由下一镜入场 + prevSprite 交叉完成。
+ */
+export function resolveShotOutTransition(
+  outType: ShotTransition,
+  currentSlot: number,
+  nextSlot: number,
+): ShotTransition {
+  if (nextSlot < 0) return outType;
+  if (nextSlot === currentSlot) return 'cut';
+  if (outType === 'fade') return 'cut';
+  return outType;
+}
+
+/**
+ * 同一分镜覆盖的连续歌词行：从定义槽 `slot` 扫到下一个有定义的分镜之前。
+ * `shots[i] == null` 视为沿用上一镜。
+ */
+export function shotRunRange(
+  shots: readonly (unknown | null)[],
+  slot: number,
+): { start: number; end: number } {
+  if (slot < 0 || slot >= shots.length) return { start: 0, end: -1 };
+  let end = slot;
+  for (let i = slot + 1; i < shots.length; i++) {
+    if (shots[i]) break;
+    end = i;
+  }
+  return { start: slot, end };
+}
+
+/**
+ * 跨句运镜时钟：把多句歌词视为一整段，返回相对 run 起点的 t / duration。
+ */
+export function shotRunMotionClock(opts: {
+  runStart: number;
+  runEnd: number;
+  index: number;
+  segmentT: number;
+  startAt: (i: number) => number;
+  endAt: (i: number) => number;
+}): { t: number; duration: number } {
+  const { runStart, runEnd, index, segmentT, startAt, endAt } = opts;
+  const t0 = startAt(runStart);
+  const t1 = endAt(runEnd);
+  const duration = Math.max(1e-6, t1 - t0);
+  const abs = startAt(index) + segmentT;
+  const t = abs < t0 ? 0 : abs > t1 ? duration : abs - t0;
+  return { t, duration };
+}
+
 export interface ShotViewInput {
   imgW: number;
   imgH: number;
@@ -125,10 +177,14 @@ export interface ShotViewInput {
   motionAmount?: number;
   inType: ShotTransition;
   outType: ShotTransition;
-  /** 段内时间（秒） */
+  /** 段内时间（秒）— 用于转场 */
   t: number;
-  /** 段时长（秒） */
+  /** 段时长（秒）— 用于转场 */
   duration: number;
+  /** 运镜时间（秒）；缺省回退到 t（单句） */
+  motionT?: number;
+  /** 运镜时长（秒）；缺省回退到 duration */
+  motionDuration?: number;
 }
 
 export interface ShotView {
@@ -151,7 +207,13 @@ export function computeShotView(input: ShotViewInput): ShotView {
   const rh = rect.h * imgH;
   const s0 = coverScale(rw, rh, screenW, screenH);
 
-  const motion = evalMotion(input.motion, duration > 0 ? clamp01(t / duration) : 0, input.motionAmount ?? 1);
+  const motionT = input.motionT ?? t;
+  const motionDuration = input.motionDuration ?? duration;
+  const motion = evalMotion(
+    input.motion,
+    motionDuration > 0 ? clamp01(motionT / motionDuration) : 0,
+    input.motionAmount ?? 1,
+  );
   const trans = evalTransition(input.inType, input.outType, t, duration);
 
   const zt = s0 * motion.zoom * trans.zoomBoost;

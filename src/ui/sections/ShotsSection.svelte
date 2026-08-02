@@ -255,9 +255,9 @@
     if (changed) setShots(shots);
   }
 
-  // 选中即聚焦；再点一次同一句 = 退出聚焦
+  // 单句模式：再点同一句退出；跟随模式：只切换到该句（取消会被进度立刻覆盖）
   function selectLine(i: number) {
-    if (selected === i) {
+    if (ui.singleLineEdit && selected === i) {
       clearLineFocus();
     } else {
       focusLine(i);
@@ -288,16 +288,18 @@
       <p class="shots-empty">{t('shot_hint')}</p>
       <ul class="shot-lines">
         {#each lines as line, i (i)}
-          <li class="shot-line-item" class:shot-line-cont={sameShotAsPrev(i)}>
+          <li class="shot-line-item">
             <button
               class="shot-line"
-              class:shot-line-active={selected === i}
+              class:shot-line-active={selected === i && ui.singleLineEdit}
+              class:shot-line-current={selected === i && !ui.singleLineEdit}
               onclick={() => selectLine(i)}
             >
               <span
                 class="shot-line-dot"
                 class:shot-line-dot-set={!!ui.shots[i]}
                 class:shot-line-dot-inherit={!ui.shots[i] && resolveShotSlot(i) >= 0}
+                class:shot-line-dot-cont={sameShotAsPrev(i)}
               ></span>
               <span class="shot-line-idx">{i + 1}</span>
               <span class="shot-line-text">{line || '—'}</span>

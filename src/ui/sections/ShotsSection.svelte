@@ -242,6 +242,22 @@
 {#if !hasImage}
   <p class="shots-empty">{t('shots_need_image')}</p>
 {:else}
+  <ul class="shot-lines">
+    {#each lines as line, i (i)}
+      <li>
+        <button
+          class="shot-line"
+          class:shot-line-active={selected === i}
+          onclick={() => selectLine(i)}
+        >
+          <span class="shot-line-dot" class:shot-line-dot-set={!!ui.shots[i]}></span>
+          <span class="shot-line-idx">{i + 1}</span>
+          <span class="shot-line-text">{line || '—'}</span>
+        </button>
+      </li>
+    {/each}
+  </ul>
+
   <p class="shots-empty">{t('shot_hint')}</p>
 
   <div
@@ -340,22 +356,6 @@
       </div>
     </div>
   {/if}
-
-  <ul class="shot-lines">
-    {#each lines as line, i (i)}
-      <li>
-        <button
-          class="shot-line"
-          class:shot-line-active={selected === i}
-          onclick={() => selectLine(i)}
-        >
-          <span class="shot-line-dot" class:shot-line-dot-set={!!ui.shots[i]}></span>
-          <span class="shot-line-idx">{i + 1}</span>
-          <span class="shot-line-text">{line || '—'}</span>
-        </button>
-      </li>
-    {/each}
-  </ul>
 {/if}
 
 <details class="collapsible-section">

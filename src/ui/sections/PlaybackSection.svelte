@@ -41,8 +41,8 @@
     if (!pendingFile) return;
     try {
       await engine.addMedia(pendingFile, ui.mediaMode);
-      engine.effectOpacity = 0.7;
-      ui.opacity = 0.7;
+      engine.effectOpacity = 0.3;
+      ui.opacity = 0.3;
       ui.mediaLoaded = true;
       ui.mediaX = 0; ui.mediaY = 0; ui.mediaScale = 1;
     } catch (err) {

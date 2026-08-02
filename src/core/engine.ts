@@ -435,6 +435,24 @@ export class PVEngine {
     return index * this._segmentDuration;
   }
 
+  /** 分镜编辑器用：指定行的结束播放时间（秒）。 */
+  segmentEndTime(index: number): number {
+    if (this._srtTimeline) {
+      return (this._srtTimeline[index]?.endMs ?? 0) / 1000;
+    }
+    if (this.lyricTimeline && this.lyricTimeline.length > 0) {
+      const next = this.lyricTimeline[index + 1];
+      if (next) return next.time - this.lyricOffsetSeconds;
+      return this.segmentStartTime(index) + this._segmentDuration;
+    }
+    return (index + 1) * this._segmentDuration;
+  }
+
+  /** 句内循环：设为行索引后播放进度锁在该句区间内打转；null 关闭。 */
+  private _loopSegment: number | null = null;
+  set loopSegment(idx: number | null) { this._loopSegment = idx; }
+  get loopSegment(): number | null { return this._loopSegment; }
+
   /** 当前播放所在的文本段/歌词行索引（段开始前为 -1）。 */
   get currentSegmentIndex(): number {
     return this.currentSegmentInfo(this._playbackTime).index;
@@ -1186,11 +1204,21 @@ export class PVEngine {
   }
 
   private update(time: number, deltaTime: number) {
-    const lyricClock = this._npActive
+    let lyricClock = this._npActive
       ? this._npTime
       : this.beat.isAudioMode
         ? this.beat.currentTime
         : time;
+
+    // 句内循环：越过句尾（或被拖到句首之前）就跳回句首
+    if (this._loopSegment !== null && !this._paused) {
+      const start = this.segmentStartTime(this._loopSegment);
+      const end = this.segmentEndTime(this._loopSegment);
+      if (lyricClock >= end - 0.01 || lyricClock < start - 0.05) {
+        this.seek(start);
+        lyricClock = start;
+      }
+    }
     this._playbackTime = lyricClock;
 
     // 逐句模板切换须在构建 ctx / 遍历特效之前完成

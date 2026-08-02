@@ -98,6 +98,8 @@ export const ui = $state({
 
   // 静止画分镜（按歌词行/文本段索引对齐，可稀疏）
   shots: [] as (Shot | null)[],
+  /** 分镜编辑器聚焦的歌词行（播放锁在句内循环）；null = 未聚焦 */
+  focusedLine: null as number | null,
 
   // 杂项
   canvasColor: '',
@@ -156,6 +158,21 @@ export function padShots(shots: (Shot | null)[], len: number): (Shot | null)[] {
 export function setShots(shots: (Shot | null)[]): void {
   ui.shots = shots;
   engine.setShots(cloneJson($state.snapshot(shots)) as (Shot | null)[]);
+}
+
+/** 聚焦一句歌词：播放进度锁在句内循环，并跳到句中段（转场已完成的帧）。 */
+export function focusLine(index: number): void {
+  ui.focusedLine = index;
+  engine.loopSegment = index;
+  const start = engine.segmentStartTime(index);
+  const end = engine.segmentEndTime(index);
+  engine.seek(Math.max(0, start + Math.max(0, end - start) / 2));
+}
+
+/** 取消歌词聚焦（退出句内循环）。 */
+export function clearLineFocus(): void {
+  ui.focusedLine = null;
+  engine.loopSegment = null;
 }
 
 export function setAspectRatio(ar: AspectRatio): void {

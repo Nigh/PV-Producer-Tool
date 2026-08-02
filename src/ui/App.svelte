@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { t } from '../i18n';
-  import { ui, initApp } from './store.svelte';
+  import { ui, initApp, clearLineFocus } from './store.svelte';
   import './theme.svelte';
   import PlaybackSection from './sections/PlaybackSection.svelte';
   import PlayerBar from './PlayerBar.svelte';
@@ -48,6 +48,7 @@
       if (e.key.toLowerCase() === 'h') {
         document.body.classList.toggle('pv-panels-hidden');
       }
+      if (e.key === 'Escape') clearLineFocus();
     };
     document.addEventListener('keydown', onKeydown);
     return () => {
@@ -58,7 +59,7 @@
 </script>
 
 <div class="app-shell">
-  <aside class="sidebar" class:sidebar-closed={!sidebarOpen}>
+  <aside class="sidebar" class:sidebar-closed={!sidebarOpen} class:sidebar-wide={active === 'shots'}>
     <div class="sidebar-header">
       <span class="sidebar-brand">{t('brand_title')}</span>
     </div>
@@ -129,15 +130,15 @@
         {/if}
       </div>
       </div>
+
+      <footer class="pv-footer">
+        <span class="pv-footer-desc">{t('footer_desc')}</span>
+        <span class="pv-footer-sep">·</span>
+        <a href={REPO_URL} target="_blank" rel="noopener" class="pv-footer-link">GitHub</a>
+        <span class="pv-footer-sep">·</span>
+        <a href="{REPO_URL}/graphs/contributors" target="_blank" rel="noopener" class="pv-footer-link">{t('footer_contributors')}</a>
+      </footer>
       <PlayerBar />
     </div>
-
-    <footer class="pv-footer">
-      <span class="pv-footer-desc">{t('footer_desc')}</span>
-      <span class="pv-footer-sep">·</span>
-      <a href={REPO_URL} target="_blank" rel="noopener" class="pv-footer-link">GitHub</a>
-      <span class="pv-footer-sep">·</span>
-      <a href="{REPO_URL}/graphs/contributors" target="_blank" rel="noopener" class="pv-footer-link">{t('footer_contributors')}</a>
-    </footer>
   </main>
 </div>

@@ -66,6 +66,25 @@ body {
   white-space: nowrap;
 }
 
+/* 句内循环徽标（聚焦某句歌词时显示，点击退出） */
+.loop-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+  border: 1px solid color-mix(in oklab, var(--color-primary) 35%, transparent);
+}
+
+.loop-chip:hover {
+  background: color-mix(in oklab, var(--color-primary) 25%, transparent);
+}
+
 body.pv-panels-hidden .player-bar {
   display: none;
 }
@@ -113,6 +132,11 @@ body.pv-panels-hidden .player-bar {
 
 .sidebar-closed {
   display: none;
+}
+
+/* 分镜页需要双栏编辑空间：侧栏加宽 */
+.sidebar-wide {
+  width: min(1280px, 92vw);
 }
 
 .sidebar-header {
@@ -466,6 +490,35 @@ textarea.textarea {
 
 /* ─── Still-image shot editor ─── */
 
+.shots-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.shots-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.shots-grid .shot-lines {
+  max-height: 56vh;
+}
+
+.shot-frame-disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.shot-line-loop {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 0.62rem;
+}
+
 .shots-empty {
   font-size: 0.72rem;
   color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
@@ -677,6 +730,10 @@ textarea.textarea {
   .effect-toggle {
     padding: 6px 0;
     font-size: 0.78rem;
+  }
+
+  .shots-grid {
+    grid-template-columns: 1fr;
   }
 }
 

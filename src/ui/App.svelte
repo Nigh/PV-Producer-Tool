@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { t } from '../i18n';
-  import { ui, initApp, clearLineFocus } from './store.svelte';
+  import { ui, engine, initApp, clearLineFocus, togglePause } from './store.svelte';
   import './theme.svelte';
   import PlaybackSection from './sections/PlaybackSection.svelte';
   import PlayerBar from './PlayerBar.svelte';
@@ -40,7 +40,7 @@
     const ro = new ResizeObserver(() => window.dispatchEvent(new Event('resize')));
     ro.observe(container);
 
-    // H 键隐藏/显示全部 UI（输入框聚焦或弹窗打开时忽略）
+    // 全局快捷键（输入框聚焦或弹窗打开时忽略）
     const onKeydown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -49,6 +49,20 @@
         document.body.classList.toggle('pv-panels-hidden');
       }
       if (e.key === 'Escape') clearLineFocus();
+      if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        togglePause();
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        clearLineFocus();
+        engine.seekPrevSegment();
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        clearLineFocus();
+        engine.seekNextSegment();
+      }
     };
     document.addEventListener('keydown', onKeydown);
     return () => {

@@ -126,8 +126,10 @@ export class ShotCamera {
     }
     this.curSprite.texture = entry.texture;
 
-    const inType = shot.in ?? 'fade';
-    const outType = shot.out ?? 'fade';
+    // 相邻句沿用同一镜时抑制转场：沿用句开头不重复入场，前一句结尾不出场
+    const inType = (index > 0 && this.resolveSlot(index - 1) === slot) ? 'cut' : (shot.in ?? 'fade');
+    const outType = (index + 1 < this.shots.length && this.resolveSlot(index + 1) === slot)
+      ? 'cut' : (shot.out ?? 'fade');
     const view = computeShotView({
       imgW: this.img!.naturalWidth,
       imgH: this.img!.naturalHeight,

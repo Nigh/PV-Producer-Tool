@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { t } from '../i18n';
-  import { ui, engine, clearLineFocus } from './store.svelte';
+  import { ui, engine, clearLineFocus, togglePause } from './store.svelte';
 
   let isSeeking = $state(false);
   let seekValue = $state(0);
@@ -38,22 +38,13 @@
     if (dir < 0) engine.seekPrevSegment(); else engine.seekNextSegment();
   }
 
-  function togglePause() {
-    if (engine.paused) {
-      engine.resume();
-      ui.paused = false;
-    } else {
-      engine.pause();
-      ui.paused = true;
-    }
-  }
 </script>
 
 <div class="player-bar">
   <button class="btn btn-sm btn-ghost" title={t('lyric_prev')} aria-label={t('lyric_prev')} onclick={() => seekSegment(-1)}>⏮</button>
   <button class="btn btn-sm btn-ghost" title={ui.paused ? t('play') : t('pause')} aria-label={ui.paused ? t('play') : t('pause')} onclick={togglePause}>{ui.paused ? '▶' : '⏸'}</button>
   <button class="btn btn-sm btn-ghost" title={t('lyric_next')} aria-label={t('lyric_next')} onclick={() => seekSegment(1)}>⏭</button>
-  {#if ui.focusedLine !== null}
+  {#if ui.focusedLine !== null && ui.singleLineEdit}
     <button class="loop-chip" title={t('loop_exit')} onclick={clearLineFocus}>
       🔁 {t('loop_line')} {ui.focusedLine + 1} ✕
     </button>

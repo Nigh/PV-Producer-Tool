@@ -214,8 +214,7 @@ export function setAspectRatio(ar: AspectRatio): void {
     );
     setShots(next);
   }
-  // PIXI resizeTo 依赖容器尺寸；画幅 class 变更后补一次
-  requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+  engine.setDesignAspect(ar);
 }
 
 export function setBeatOffset(val: number): void {
@@ -487,7 +486,7 @@ export async function toggleNowPlaying(on: boolean): Promise<boolean> {
 
 /** 引擎初始化 + URL 参数恢复。App.svelte onMount 调用一次。 */
 export async function initApp(container: HTMLElement): Promise<void> {
-  await engine.init(container);
+  await engine.init(container, ui.aspectRatio);
   engine.beat.beatOffset = ui.beatOffset;
   // 逐句模板：引擎按分镜切换模板时经这里解析选择值并回写 UI 状态
   engine.templateResolver = (sel) => configFor(sel);

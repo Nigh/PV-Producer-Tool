@@ -607,6 +607,7 @@ textarea.textarea {
   flex-direction: column;
   gap: 2px;
   max-height: 40vh;
+  overflow-x: hidden;
   overflow-y: auto;
   /* 列方向 flex 容器里 overflow:auto 的子项会被压到 0 高，禁止收缩 */
   flex-shrink: 0;
@@ -614,6 +615,22 @@ textarea.textarea {
 
 .shot-line-item {
   position: relative;
+  overflow: visible;
+}
+
+/* 同分镜连线：按行高百分比从上一圆下缘接到当前圆上缘（gap=2px, dot=7px） */
+.shot-line-cont::before {
+  content: '';
+  position: absolute;
+  left: calc(6px + 3.5px);
+  top: calc(-50% - 2px + 3.5px);
+  height: calc(100% + 2px - 7px);
+  width: 3px;
+  margin-left: -1.5px;
+  background: var(--color-primary);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .shot-line {
@@ -627,6 +644,7 @@ textarea.textarea {
   text-align: left;
   color: color-mix(in oklab, var(--color-base-content) 75%, transparent);
   cursor: pointer;
+  overflow: visible;
 }
 
 .shot-line:hover {
@@ -665,20 +683,6 @@ textarea.textarea {
 .shot-line-dot-inherit {
   border-color: var(--color-primary);
   background: transparent;
-}
-
-/* padding 4 + gap 2 + padding 4 = 10px between adjacent 7px dots */
-.shot-line-dot-cont::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 100%;
-  transform: translateX(-50%);
-  width: 3px;
-  height: 10px;
-  background: var(--color-primary);
-  opacity: 0.55;
-  pointer-events: none;
 }
 
 .shot-line-idx {

@@ -288,7 +288,7 @@
       <p class="shots-empty">{t('shot_hint')}</p>
       <ul class="shot-lines">
         {#each lines as line, i (i)}
-          <li class="shot-line-item">
+          <li class="shot-line-item" class:shot-line-cont={sameShotAsPrev(i)}>
             <button
               class="shot-line"
               class:shot-line-active={selected === i && ui.singleLineEdit}
@@ -299,7 +299,6 @@
                 class="shot-line-dot"
                 class:shot-line-dot-set={!!ui.shots[i]}
                 class:shot-line-dot-inherit={!ui.shots[i] && resolveShotSlot(i) >= 0}
-                class:shot-line-dot-cont={sameShotAsPrev(i)}
               ></span>
               <span class="shot-line-idx">{i + 1}</span>
               <span class="shot-line-text">{line || '—'}</span>

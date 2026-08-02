@@ -12,6 +12,7 @@ import {
 } from '../src/core/shotMath.ts';
 import {
   canvasAspect, shotNormAspect, maxCenteredRect, refitRectToAspect, aspectRectFromDrag,
+  designSize,
 } from '../src/core/shotAspect.ts';
 
 // ── coverScale：cover 语义 = 两个方向都至少铺满 ──
@@ -199,6 +200,8 @@ assert.equal(resolveShotOutTransition('zoom', 0, 0), 'cut');
 // ── shotAspect：画幅锁定矩形 ──
 assert.equal(canvasAspect('16:9'), 16 / 9);
 assert.equal(canvasAspect('9:16'), 9 / 16);
+assert.deepEqual(designSize('16:9'), { w: 1920, h: 1080 });
+assert.deepEqual(designSize('9:16'), { w: 1080, h: 1920 });
 {
   // 正方形原图 + 16:9 画布 → 归一化框 w/h = 16/9
   const na = shotNormAspect(16 / 9, 1000, 1000);

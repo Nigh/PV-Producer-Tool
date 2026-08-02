@@ -3,6 +3,8 @@
 
 import * as PIXI from 'pixi.js';
 import type { TemplateConfig, UpdateContext, ColorPalette, LayerType, MotionTargetInfo, LyricLine, Shot } from './types';
+import type { AspectRatio } from './shotAspect';
+import { designSize } from './shotAspect';
 import { ShotCamera } from './shotCamera';
 import { createEffect, BaseEffect, detachFiltersDeep } from '../effects';
 import { extractDominantColors } from './colorExtractor';
@@ -74,7 +76,9 @@ export class PVEngine {
 
   private _nativeDPR = 1;
   private _currentResolution = 1;
-  private _resizeParent: HTMLElement | null = null;
+  /** 逻辑画布尺寸：固定设计分辨率，预览靠 CSS 等比缩放 */
+  private _designW = 1920;
+  private _designH = 1080;
   private _loading = false;
   /** 帧边界再重建：避免 resize/update 中途拆树导致 Pixi alphaMode 空引用崩溃。 */
   private _pendingTemplate: TemplateConfig | null = null;
@@ -107,13 +111,16 @@ export class PVEngine {
     this.glitchFilter = new GlitchFilter();
   }
 
-  async init(parent: HTMLElement) {
+  async init(parent: HTMLElement, aspect: AspectRatio = '16:9') {
     this._nativeDPR = Math.min(window.devicePixelRatio || 1, 3);
     this._currentResolution = this._nativeDPR;
-    this._resizeParent = parent;
+    const ds = designSize(aspect);
+    this._designW = ds.w;
+    this._designH = ds.h;
 
     await this.app.init({
-      resizeTo: parent,
+      width: this._designW,
+      height: this._designH,
       backgroundColor: 0x000000,
       backgroundAlpha: 0,
       antialias: true,
@@ -147,24 +154,7 @@ export class PVEngine {
 
     this.app.stage.filters = [this.hueFilter, this.glitchFilter];
 
-    // 画布尺寸变化（画幅切换/侧栏折叠）后重建特效：多数特效在 setup()
-    // 里按当时的屏幕尺寸摆放元素，只能整体重排。debounce 后挂到下一帧
-    // ticker 开头执行，绝不在 resize→render 回调里同步 destroy。
-    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
-    let lastW = this.app.screen.width;
-    let lastH = this.app.screen.height;
-    this.app.renderer.on('resize', () => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        const w = this.app.screen.width;
-        const h = this.app.screen.height;
-        if ((w !== lastW || h !== lastH) && this.currentTemplate) {
-          lastW = w;
-          lastH = h;
-          this.scheduleTemplateReload(this.currentTemplate);
-        }
-      }, 200);
-    });
+    // 逻辑分辨率变化（画幅切换）后重建特效；窗口缩放只 CSS 缩放 canvas，不改逻辑尺寸。
 
     this.app.ticker.add((ticker) => {
       // 先于一切 update / 本帧 render：冲刷挂起的模板重建
@@ -1122,12 +1112,19 @@ export class PVEngine {
     if (target !== this._currentResolution) {
       this._currentResolution = target;
       this.app.renderer.resolution = target;
-      if (this._resizeParent) {
-        const w = this._resizeParent.clientWidth;
-        const h = this._resizeParent.clientHeight;
-        this.app.renderer.resize(w, h);
-      }
+      this.app.renderer.resize(this._designW, this._designH);
     }
+  }
+
+  /** 切换画幅逻辑分辨率（16:9 ↔ 9:16）；预览框 CSS 负责等比缩放。 */
+  setDesignAspect(ar: AspectRatio): void {
+    const { w, h } = designSize(ar);
+    if (w === this._designW && h === this._designH) return;
+    this._designW = w;
+    this._designH = h;
+    if (!this.app.renderer) return;
+    this.app.renderer.resize(w, h);
+    if (this.currentTemplate) this.scheduleTemplateReload(this.currentTemplate);
   }
 
   private syncMotionDetector(): void {

@@ -9,6 +9,11 @@ export function canvasAspect(ar: AspectRatio): number {
   return ar === '9:16' ? 9 / 16 : 16 / 9;
 }
 
+/** 逻辑画布固定分辨率（预览 CSS 等比缩放，导出与排版不随窗口变）。 */
+export function designSize(ar: AspectRatio): { w: number; h: number } {
+  return ar === '9:16' ? { w: 1080, h: 1920 } : { w: 1920, h: 1080 };
+}
+
 /** 原图归一化坐标下，使裁切区投影到画布后等于 canvasAsp 的 w/h。 */
 export function shotNormAspect(canvasAsp: number, imgW: number, imgH: number): number {
   return canvasAsp * (imgH / Math.max(imgW, 1e-9));

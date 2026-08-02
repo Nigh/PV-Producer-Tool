@@ -161,12 +161,22 @@ export class PVEngine {
           // In Now Playing mode, advance time locally when not paused
           if (!this._npPaused) {
             this._npTime += dt;
+            // NP 到曲终停住，避免计时冲过总时长
+            if (this._npDuration > 0 && this._npTime >= this._npDuration) {
+              this._npTime = this._npDuration;
+              this._npPaused = true;
+            }
           }
           this._time = this._npTime;
         } else if (this.beat.isAudioMode) {
           this._time = this.beat.currentTime;
         } else {
           this._time += dt;
+          // 无音频自由跑：循环钳位，计时不超过 timelineDuration
+          const dur = this.timelineDuration;
+          if (dur > 0 && this._time >= dur) {
+            this._time %= dur;
+          }
         }
       }
 
@@ -200,7 +210,8 @@ export class PVEngine {
   }
 
   seek(time: number) {
-    this._time = Math.max(0, time);
+    const dur = this.timelineDuration;
+    this._time = Math.max(0, dur > 0 ? Math.min(time, dur) : time);
     if (this._npActive) {
       this._npTime = this._time;
     } else if (this.beat.isAudioMode) {
@@ -222,8 +233,7 @@ export class PVEngine {
         this._animationSpeed = template.animationSpeed;
       }
       if (template.bgOpacity !== undefined) {
-        this._effectOpacity = template.bgOpacity;
-        this.bgFill.alpha = template.bgOpacity;
+        this.effectOpacity = template.bgOpacity;
       }
       this._outlineEnabled = template.features?.mediaOutline ?? false;
       this._motionDetectionEnabled = template.features?.motionDetection ?? false;
@@ -551,7 +561,11 @@ export class PVEngine {
 
   set effectOpacity(val: number) {
     this._effectOpacity = val;
+    // bgFill + background 层一起透明，才能透出底下 media/分镜；
+    // 不动 effectsRoot，避免歌词/装饰一并变淡。
     this.bgFill.alpha = val;
+    const bg = this.layers.get('background');
+    if (bg) bg.alpha = val;
   }
   get effectOpacity() { return this._effectOpacity; }
 
@@ -1164,7 +1178,9 @@ export class PVEngine {
   }
 
   get playbackTime(): number {
-    return this._playbackTime;
+    const dur = this.timelineDuration;
+    // 音频尾帧 currentTime 偶发略超 duration；显示/进度条一律钳住
+    return dur > 0 ? Math.min(this._playbackTime, dur) : this._playbackTime;
   }
 
   get timelineDuration(): number {

@@ -30,7 +30,10 @@ export const ja: Record<LocaleKey, string> = {
 
   // 静止画カット割り
   'shots_need_image': '先に「再生と素材」で静止画を読み込んでください',
-  'shot_hint': '画像上をドラッグして切り取り範囲を指定。枠内ドラッグで移動、右下で拡縮',
+  'shot_hint': '下の歌詞行を選んでから枠をドラッグ（行ごとにカット可）。枠内で移動、右下で拡縮',
+  'shot_unset': 'この行は未設定 — 画像上をドラッグして追加',
+  'shot_fill_unset': '未設定行を全画面で埋める',
+  'shot_copy_prev': '前のカットをコピー',
   'shot_in': 'イン In',
   'shot_out': 'アウト Out',
   'shot_motion': 'モーション Motion',

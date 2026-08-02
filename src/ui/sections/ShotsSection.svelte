@@ -3,11 +3,13 @@
 <script lang="ts">
   import { t } from '../../i18n';
   import type { Shot, ShotRect, ShotTransition, ShotMotion } from '../../core/types';
-  import { ui, engine, setShots } from '../store.svelte';
+  import { ui, engine, setShots, padShots } from '../store.svelte';
+  import Slider from '../Slider.svelte';
 
   const TRANSITIONS: ShotTransition[] = ['cut', 'fade', 'slide', 'zoom'];
   const MOTIONS: ShotMotion[] = ['none', 'zoomIn', 'zoomOut', 'panLeft', 'panRight', 'panUp', 'panDown'];
   const MIN_SIZE = 0.05;
+  const FULL_FRAME: Shot = { rect: { x: 0, y: 0, w: 1, h: 1 }, in: 'fade', out: 'fade', motion: 'none' };
 
   let selected = $state(0);
 
@@ -25,6 +27,15 @@
   });
 
   const currentShot = $derived(ui.shots[selected] ?? null);
+
+  // 歌词行数变化时补齐 shots 槽位，保证每句都有可编辑索引
+  $effect(() => {
+    const n = lines.length;
+    if (n > 0 && ui.shots.length < n) {
+      setShots(padShots(ui.shots, n));
+    }
+    if (selected >= n && n > 0) selected = n - 1;
+  });
 
   // ── 原图缩略图（源图的 object URL 已释放，只能经 canvas 重绘）──
   let thumbCanvas: HTMLCanvasElement | undefined = $state();
@@ -124,7 +135,7 @@
   }
 
   function commitRect(rect: ShotRect) {
-    const shots = [...ui.shots];
+    const shots = padShots(ui.shots, lines.length);
     const prev = shots[selected];
     shots[selected] = { in: 'fade', out: 'fade', motion: 'none', ...prev, rect };
     setShots(shots);
@@ -132,15 +143,36 @@
 
   function updateShot(patch: Partial<Shot>) {
     if (!currentShot) return;
-    const shots = [...ui.shots];
+    const shots = padShots(ui.shots, lines.length);
     shots[selected] = { ...currentShot, ...patch };
     setShots(shots);
   }
 
   function clearShot() {
-    const shots = [...ui.shots];
+    const shots = padShots(ui.shots, lines.length);
     shots[selected] = null;
     setShots(shots);
+  }
+
+  function copyPrevShot() {
+    if (selected <= 0) return;
+    const shots = padShots(ui.shots, lines.length);
+    const prev = shots.slice(0, selected).reverse().find((s) => !!s);
+    if (!prev) return;
+    shots[selected] = { ...prev, rect: { ...prev.rect } };
+    setShots(shots);
+  }
+
+  function fillUnsetFullFrame() {
+    const shots = padShots(ui.shots, lines.length);
+    let changed = false;
+    for (let i = 0; i < shots.length; i++) {
+      if (!shots[i]) {
+        shots[i] = { ...FULL_FRAME, rect: { ...FULL_FRAME.rect } };
+        changed = true;
+      }
+    }
+    if (changed) setShots(shots);
   }
 
   function selectLine(i: number) {
@@ -157,6 +189,12 @@
   <p class="shots-empty">{t('shots_need_image')}</p>
 {:else}
   <p class="shots-empty">{t('shot_hint')}</p>
+
+  <Slider
+    label={t('bg_opacity')} display={`${Math.round(ui.opacity * 100)}%`}
+    min={0} max={1} step={0.05} bind:value={ui.opacity}
+    oninput={() => { engine.effectOpacity = ui.opacity; }}
+  />
 
   <div
     class="shot-frame"
@@ -177,6 +215,17 @@
         <span class="shot-rect-handle"></span>
       </div>
     {/if}
+  </div>
+
+  {#if !currentShot}
+    <p class="shots-empty">{t('shot_unset')}</p>
+  {/if}
+
+  <div class="control-group">
+    <div class="template-actions">
+      <button class="btn btn-xs" onclick={fillUnsetFullFrame}>{t('shot_fill_unset')}</button>
+      <button class="btn btn-xs" disabled={selected <= 0} onclick={copyPrevShot}>{t('shot_copy_prev')}</button>
+    </div>
   </div>
 
   {#if currentShot}

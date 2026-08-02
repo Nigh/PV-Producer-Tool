@@ -30,7 +30,10 @@ export const en: Record<LocaleKey, string> = {
 
   // Still-image shots
   'shots_need_image': 'Load a still image in "Playback & Media" first',
-  'shot_hint': 'Drag on the image to frame a shot; drag inside to move, bottom-right corner to resize',
+  'shot_hint': 'Select a lyric line below, then drag to frame it (one shot per line); drag inside to move, corner to resize',
+  'shot_unset': 'No frame for this line — drag on the image to add one',
+  'shot_fill_unset': 'Fill unset lines (full frame)',
+  'shot_copy_prev': 'Copy previous shot',
   'shot_in': 'In',
   'shot_out': 'Out',
   'shot_motion': 'Motion',

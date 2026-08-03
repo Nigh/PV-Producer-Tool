@@ -62,12 +62,20 @@ export type ShotMotion =
   | 'panUp'
   | 'panDown';
 
-/** 单句歌词对应的静止画分镜：取景框 + 入/出转场 + 过程运动。 */
+/** 单句歌词对应的静止画分镜：取景框 + 入/出转场 + 过程运动 + 逐句效果覆盖。 */
 export interface Shot {
   rect: ShotRect;
   in?: ShotTransition;
   out?: ShotTransition;
   motion?: ShotMotion;
+  /** 运镜幅度倍率（0..2，缺省 1）。 */
+  motionAmount?: number;
+  /** 模板选择值（'0'..'N' 内置 | 'user-N'）；空 = 沿用上一镜的模板。 */
+  template?: string;
+  /** 以下为空 = 跟随全局默认。 */
+  animationSpeed?: number;
+  motionIntensity?: number;
+  bgOpacity?: number;
 }
 
 export interface MotionTargetInfo {

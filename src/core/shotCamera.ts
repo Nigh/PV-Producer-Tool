@@ -7,7 +7,10 @@
 
 import * as PIXI from 'pixi.js';
 import type { Shot } from './types';
-import { expandRect, evalTransition, computeShotView } from './shotMath';
+import {
+  expandRect, evalTransition, computeShotView, shotRunRange, shotRunMotionClock,
+  resolveShotOutTransition,
+} from './shotMath';
 
 /** 取景框外的运动余量比例（供 Ken Burns 平移/推拉与 zoom 转场使用）。 */
 const CROP_MARGIN = 0.3;
@@ -93,8 +96,17 @@ export class ShotCamera {
   /**
    * 每帧更新。index 为当前歌词行/文本段索引，t 为段内时间，duration 为段时长。
    * 分镜数组可稀疏：向前回退到最近定义的镜；index 之前无镜时用第一个有效镜。
+   * startAt/endAt 提供各句绝对时间边界，用于跨句运镜时钟。
    */
-  update(index: number, t: number, duration: number, screenW: number, screenH: number): void {
+  update(
+    index: number,
+    t: number,
+    duration: number,
+    screenW: number,
+    screenH: number,
+    startAt: (i: number) => number,
+    endAt: (i: number) => number,
+  ): void {
     if (!this.enabled || this.container.destroyed) {
       this.container.visible = false;
       return;
@@ -126,8 +138,22 @@ export class ShotCamera {
     }
     this.curSprite.texture = entry.texture;
 
-    const inType = shot.in ?? 'fade';
-    const outType = shot.out ?? 'fade';
+    // 相邻句沿用同一镜时抑制入场；出场见 resolveShotOutTransition（切镜不 fade 透底）
+    const inType = (index > 0 && this.resolveSlot(index - 1) === slot) ? 'cut' : (shot.in ?? 'fade');
+    const nextSlot = index + 1 < this.shots.length ? this.resolveSlot(index + 1) : -1;
+    const outType = resolveShotOutTransition(shot.out ?? 'fade', slot, nextSlot);
+
+    // 运镜跨沿用句整段推进；转场仍用句内 t/duration
+    const run = shotRunRange(this.shots, slot);
+    const motionClock = shotRunMotionClock({
+      runStart: run.start,
+      runEnd: run.end,
+      index,
+      segmentT: t,
+      startAt,
+      endAt,
+    });
+
     const view = computeShotView({
       imgW: this.img!.naturalWidth,
       imgH: this.img!.naturalHeight,
@@ -136,8 +162,11 @@ export class ShotCamera {
       texScale: entry.texScale,
       screenW, screenH,
       motion: shot.motion ?? 'none',
+      motionAmount: shot.motionAmount ?? 1,
       inType, outType,
       t, duration,
+      motionT: motionClock.t,
+      motionDuration: motionClock.duration,
     });
     this.curSprite.scale.set(view.scale);
     this.curSprite.position.set(view.x, view.y);

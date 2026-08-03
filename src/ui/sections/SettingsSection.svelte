@@ -4,24 +4,10 @@
   import { onMount } from 'svelte';
   import { t, locale } from '../../i18n';
   import { showToast, showModal } from '../../core/uiHelpers';
-  import { ui, engine, toggleNowPlaying } from '../store.svelte';
+  import { ui, engine, toggleNowPlaying, setAspectRatio, setBeatOffset } from '../store.svelte';
+  import type { AspectRatio } from '../../core/shotAspect';
   import { theme, setTheme } from '../theme.svelte';
-
-  const SWATCHES = [
-    { color: '#ffffff', key: 'white' },
-    { color: '#000000', key: 'black' },
-    { color: '#1122ee', key: 'blue' },
-    { color: '#8b1a1a', key: 'red' },
-    { color: '#EEDD11', key: 'yellow' },
-    { color: '#f5c6d0', key: 'pink' },
-    { color: '#ED1C24', key: 'p5red' },
-    { color: '#ABC5D2', key: 'light_blue' },
-  ] as const;
-
-  function setCanvasColor(color: string) {
-    ui.canvasColor = color;
-    engine.canvasColor = color || null;
-  }
+  import Slider from '../Slider.svelte';
 
   // ── 字体（Local Font Access API，仅 Chromium 桌面）──
   const fontApiAvailable = 'queryLocalFonts' in window;
@@ -71,6 +57,10 @@
       );
     }
   }
+
+  function onAspectChange(e: Event) {
+    setAspectRatio((e.currentTarget as HTMLSelectElement).value as AspectRatio);
+  }
 </script>
 
 <div class="control-group">
@@ -85,26 +75,11 @@
 </div>
 
 <div class="control-group">
-  <label for="canvas-color-swatches">{t('canvas_color')}</label>
-  <div class="color-swatches" id="canvas-color-swatches">
-    <button
-      class="swatch"
-      class:swatch-active={ui.canvasColor === ''}
-      title={t('follow_template')}
-      aria-label={t('follow_template')}
-      onclick={() => setCanvasColor('')}
-    ><span class="swatch-auto">A</span></button>
-    {#each SWATCHES as sw (sw.color)}
-      <button
-        class="swatch"
-        class:swatch-active={ui.canvasColor === sw.color}
-        title={t(sw.key)}
-        aria-label={t(sw.key)}
-        style="background:{sw.color}"
-        onclick={() => setCanvasColor(sw.color)}
-      ></button>
-    {/each}
-  </div>
+  <label for="aspect-select">{t('aspect_ratio')}</label>
+  <select id="aspect-select" class="select select-sm w-full" value={ui.aspectRatio} onchange={onAspectChange}>
+    <option value="16:9">{t('aspect_16_9')}</option>
+    <option value="9:16">{t('aspect_9_16')}</option>
+  </select>
 </div>
 
 {#if fontApiAvailable}
@@ -133,6 +108,22 @@
     {/each}
   </select>
 </div>
+
+<Slider
+  label={t('bpm')} display={String(ui.bpm)}
+  min={30} max={240} step={1} bind:value={ui.bpm}
+  oninput={() => { engine.beat.bpm = ui.bpm; }}
+/>
+<Slider
+  label={t('beat_offset')} display={`${ui.beatOffset.toFixed(2)} ${t('beat_unit')}`}
+  min={0} max={1} step={0.01} bind:value={ui.beatOffset}
+  oninput={() => setBeatOffset(ui.beatOffset)}
+/>
+<Slider
+  label={t('beat_react')} display={ui.beatReact.toFixed(2)}
+  min={0} max={1} step={0.05} bind:value={ui.beatReact}
+  oninput={() => { engine.beatReactivity = ui.beatReact; }}
+/>
 
 {#if locale === 'zh'}
   <div class="control-group">

@@ -3,8 +3,10 @@
 
 import * as PIXI from 'pixi.js';
 import type { TemplateConfig, UpdateContext, ColorPalette, LayerType, MotionTargetInfo, LyricLine, Shot } from './types';
+import type { AspectRatio } from './shotAspect';
+import { designSize } from './shotAspect';
 import { ShotCamera } from './shotCamera';
-import { createEffect, BaseEffect } from '../effects';
+import { createEffect, BaseEffect, detachFiltersDeep } from '../effects';
 import { extractDominantColors } from './colorExtractor';
 import { MediaOutlineRenderer } from './mediaOutline';
 import { GlitchFilter } from './glitchFilter';
@@ -74,8 +76,14 @@ export class PVEngine {
 
   private _nativeDPR = 1;
   private _currentResolution = 1;
-  private _resizeParent: HTMLElement | null = null;
+  /** 逻辑画布尺寸：固定设计分辨率，预览靠 CSS 等比缩放 */
+  private _designW = 1920;
+  private _designH = 1080;
   private _loading = false;
+  /** 帧边界再重建：避免 resize/update 中途拆树导致 Pixi alphaMode 空引用崩溃。 */
+  private _pendingTemplate: TemplateConfig | null = null;
+  private _pendingShotSwitch = false;
+  private _pendingShotSel: string | null = null;
   private _bgColorOverride: string | null = null;
   private _fontFamilyOverride: string | null = null;
   private _tick = 0;
@@ -103,13 +111,16 @@ export class PVEngine {
     this.glitchFilter = new GlitchFilter();
   }
 
-  async init(parent: HTMLElement) {
+  async init(parent: HTMLElement, aspect: AspectRatio = '16:9') {
     this._nativeDPR = Math.min(window.devicePixelRatio || 1, 3);
     this._currentResolution = this._nativeDPR;
-    this._resizeParent = parent;
+    const ds = designSize(aspect);
+    this._designW = ds.w;
+    this._designH = ds.h;
 
     await this.app.init({
-      resizeTo: parent,
+      width: this._designW,
+      height: this._designH,
       backgroundColor: 0x000000,
       backgroundAlpha: 0,
       antialias: true,
@@ -143,7 +154,12 @@ export class PVEngine {
 
     this.app.stage.filters = [this.hueFilter, this.glitchFilter];
 
+    // 逻辑分辨率变化（画幅切换）后重建特效；窗口缩放只 CSS 缩放 canvas，不改逻辑尺寸。
+
     this.app.ticker.add((ticker) => {
+      // 先于一切 update / 本帧 render：冲刷挂起的模板重建
+      this.flushPendingTemplate();
+
       const now = performance.now();
       const dt = (now - this._lastFrameTime) / 1000;
       this._lastFrameTime = now;
@@ -161,12 +177,22 @@ export class PVEngine {
           // In Now Playing mode, advance time locally when not paused
           if (!this._npPaused) {
             this._npTime += dt;
+            // NP 到曲终停住，避免计时冲过总时长
+            if (this._npDuration > 0 && this._npTime >= this._npDuration) {
+              this._npTime = this._npDuration;
+              this._npPaused = true;
+            }
           }
           this._time = this._npTime;
         } else if (this.beat.isAudioMode) {
           this._time = this.beat.currentTime;
         } else {
           this._time += dt;
+          // 无音频自由跑：循环钳位，计时不超过 timelineDuration
+          const dur = this.timelineDuration;
+          if (dur > 0 && this._time >= dur) {
+            this._time %= dur;
+          }
         }
       }
 
@@ -200,7 +226,8 @@ export class PVEngine {
   }
 
   seek(time: number) {
-    this._time = Math.max(0, time);
+    const dur = this.timelineDuration;
+    this._time = Math.max(0, dur > 0 ? Math.min(time, dur) : time);
     if (this._npActive) {
       this._npTime = this._time;
     } else if (this.beat.isAudioMode) {
@@ -208,8 +235,42 @@ export class PVEngine {
     }
   }
 
+  /**
+   * 挂起模板重建，下一帧 ticker 开头执行。
+   * resize 回调 / update 中途切模板必须走这里，禁止同步 destroy。
+   */
+  scheduleTemplateReload(
+    template: TemplateConfig,
+    opts?: { shotSwitch?: boolean; appliedSel?: string | null },
+  ): void {
+    this._pendingTemplate = template;
+    this._pendingShotSwitch = opts?.shotSwitch ?? false;
+    this._pendingShotSel = opts?.appliedSel ?? null;
+  }
+
+  private flushPendingTemplate(): void {
+    if (!this._pendingTemplate || this._loading) return;
+    const tpl = this._pendingTemplate;
+    const shotSwitch = this._pendingShotSwitch;
+    const appliedSel = this._pendingShotSel;
+    this._pendingTemplate = null;
+    this._pendingShotSwitch = false;
+    this._pendingShotSel = null;
+
+    this._shotTemplateSwitch = shotSwitch;
+    try {
+      this.loadTemplate(tpl);
+    } finally {
+      this._shotTemplateSwitch = false;
+    }
+    if (appliedSel !== null) this.onShotTemplateApplied?.(appliedSel);
+  }
+
   loadTemplate(template: TemplateConfig) {
     if (this._loading) return;
+    // 重建期间停 ticker，避免 destroy 与本帧后续 update/render 交错
+    const wasTicking = this.app.ticker.started;
+    if (wasTicking) this.app.ticker.stop();
     this._loading = true;
 
     try {
@@ -222,8 +283,7 @@ export class PVEngine {
         this._animationSpeed = template.animationSpeed;
       }
       if (template.bgOpacity !== undefined) {
-        this._effectOpacity = template.bgOpacity;
-        this.bgFill.alpha = template.bgOpacity;
+        this.effectOpacity = template.bgOpacity;
       }
       this._outlineEnabled = template.features?.mediaOutline ?? false;
       this._motionDetectionEnabled = template.features?.motionDetection ?? false;
@@ -276,7 +336,7 @@ export class PVEngine {
         this.hueShift = template.postfx.hueShift ?? 0;
       }
 
-      if (template.shots) {
+      if (template.shots && !this._shotTemplateSwitch) {
         this.setShots(template.shots);
       }
 
@@ -284,6 +344,7 @@ export class PVEngine {
       this.syncResolution();
     } finally {
       this._loading = false;
+      if (wasTicking) this.app.ticker.start();
     }
   }
 
@@ -363,6 +424,24 @@ export class PVEngine {
     }
     return index * this._segmentDuration;
   }
+
+  /** 分镜编辑器用：指定行的结束播放时间（秒）。 */
+  segmentEndTime(index: number): number {
+    if (this._srtTimeline) {
+      return (this._srtTimeline[index]?.endMs ?? 0) / 1000;
+    }
+    if (this.lyricTimeline && this.lyricTimeline.length > 0) {
+      const next = this.lyricTimeline[index + 1];
+      if (next) return next.time - this.lyricOffsetSeconds;
+      return this.segmentStartTime(index) + this._segmentDuration;
+    }
+    return (index + 1) * this._segmentDuration;
+  }
+
+  /** 句内循环：设为行索引后播放进度锁在该句区间内打转；null 关闭。 */
+  private _loopSegment: number | null = null;
+  set loopSegment(idx: number | null) { this._loopSegment = idx; }
+  get loopSegment(): number | null { return this._loopSegment; }
 
   /** 当前播放所在的文本段/歌词行索引（段开始前为 -1）。 */
   get currentSegmentIndex(): number {
@@ -551,7 +630,11 @@ export class PVEngine {
 
   set effectOpacity(val: number) {
     this._effectOpacity = val;
+    // bgFill + background 层一起透明，才能透出底下 media/分镜；
+    // 不动 effectsRoot，避免歌词/装饰一并变淡。
     this.bgFill.alpha = val;
+    const bg = this.layers.get('background');
+    if (bg) bg.alpha = val;
   }
   get effectOpacity() { return this._effectOpacity; }
 
@@ -1029,12 +1112,19 @@ export class PVEngine {
     if (target !== this._currentResolution) {
       this._currentResolution = target;
       this.app.renderer.resolution = target;
-      if (this._resizeParent) {
-        const w = this._resizeParent.clientWidth;
-        const h = this._resizeParent.clientHeight;
-        this.app.renderer.resize(w, h);
-      }
+      this.app.renderer.resize(this._designW, this._designH);
     }
+  }
+
+  /** 切换画幅逻辑分辨率（16:9 ↔ 9:16）；预览框 CSS 负责等比缩放。 */
+  setDesignAspect(ar: AspectRatio): void {
+    const { w, h } = designSize(ar);
+    if (w === this._designW && h === this._designH) return;
+    this._designW = w;
+    this._designH = h;
+    if (!this.app.renderer) return;
+    this.app.renderer.resize(w, h);
+    if (this.currentTemplate) this.scheduleTemplateReload(this.currentTemplate);
   }
 
   private syncMotionDetector(): void {
@@ -1058,18 +1148,79 @@ export class PVEngine {
     this.activeEffects = [];
     for (const [key, layer] of this.layers) {
       if (key !== 'media' && layer.children.length > 0) {
-        try { layer.removeChildren().forEach(c => c.destroy()); } catch { /* safe */ }
+        try {
+          layer.removeChildren().forEach(c => {
+            detachFiltersDeep(c);
+            c.destroy({ children: true });
+          });
+        } catch { /* safe */ }
       }
     }
   }
 
+  /** 当前句显式设置的分镜（不向前回退：参数覆盖只对本句生效）。 */
+  private currentShotOverride(lyricClock: number): Shot | null {
+    const idx = this.currentSegmentInfo(lyricClock).index;
+    return idx >= 0 ? this._shots[idx] ?? null : null;
+  }
+
+  /**
+   * 当前句生效的模板选择值：本句未设则向前回退到最近定义（与取景框
+   * resolveSlot 同语义）；全部未设返回 null（保持当前模板）。
+   */
+  private effectiveShotTemplate(lyricClock: number): string | null {
+    const idx = this.currentSegmentInfo(lyricClock).index;
+    for (let i = Math.min(idx, this._shots.length - 1); i >= 0; i--) {
+      const tpl = this._shots[i]?.template;
+      if (tpl !== undefined) return tpl;
+    }
+    return null;
+  }
+
+  /** UI 注入：把模板选择值（'0' | 'user-N'）解析成配置。 */
+  templateResolver: ((sel: string) => TemplateConfig | null) | null = null;
+  /** 逐句模板实际切换时回调（UI 同步下拉/勾选状态）。 */
+  onShotTemplateApplied: ((sel: string) => void) | null = null;
+  private _activeShotTemplateSel: string | null = null;
+
+  private syncShotTemplate(lyricClock: number): void {
+    if (!this.templateResolver) return;
+    const sel = this.effectiveShotTemplate(lyricClock);
+    if (sel === null || sel === this._activeShotTemplateSel) return;
+    const config = this.templateResolver(sel);
+    if (!config) return;
+    // 占位，避免每帧重复排队；真正 load 延到下一帧 ticker 开头
+    this._activeShotTemplateSel = sel;
+    this.scheduleTemplateReload(config, { shotSwitch: true, appliedSel: sel });
+  }
+  private _shotTemplateSwitch = false;
+
+  /** 外部直接换模板（模板管理/URL）后重置逐句追踪，避免误判未变。 */
+  resetShotTemplateTracking(sel: string | null = null): void {
+    this._activeShotTemplateSel = sel;
+  }
+
   private update(time: number, deltaTime: number) {
-    const lyricClock = this._npActive
+    let lyricClock = this._npActive
       ? this._npTime
       : this.beat.isAudioMode
         ? this.beat.currentTime
         : time;
+
+    // 句内循环：越过句尾（或被拖到句首之前）就跳回句首
+    if (this._loopSegment !== null && !this._paused) {
+      const start = this.segmentStartTime(this._loopSegment);
+      const end = this.segmentEndTime(this._loopSegment);
+      if (lyricClock >= end - 0.01 || lyricClock < start - 0.05) {
+        this.seek(start);
+        lyricClock = start;
+      }
+    }
     this._playbackTime = lyricClock;
+
+    // 逐句模板切换须在构建 ctx / 遍历特效之前完成
+    this.syncShotTemplate(lyricClock);
+    const shotOv = this.currentShotOverride(lyricClock);
 
     if (this.motionDetector && this.mediaElement instanceof HTMLVideoElement) {
       this.motionDetector.detect(this.mediaElement);
@@ -1093,11 +1244,11 @@ export class PVEngine {
       screenWidth: this.app.screen.width,
       screenHeight: this.app.screen.height,
       palette: this.palette,
-      animationSpeed: this._animationSpeed,
-      motionIntensity: this._motionIntensity,
+      animationSpeed: shotOv?.animationSpeed ?? this._animationSpeed,
+      motionIntensity: shotOv?.motionIntensity ?? this._motionIntensity,
       currentText: this.getDisplayText(lyricClock),
       segmentTime: this.getSegmentTime(lyricClock),
-      beatIntensity: this.beat.getIntensity(time) * this._beatReactivity,
+      beatIntensity: this.beat.getIntensity(lyricClock) * this._beatReactivity,
       motionTargets: this.motionTargets,
     };
 
@@ -1106,11 +1257,20 @@ export class PVEngine {
       this.shotCamera.update(
         seg.index, ctx.segmentTime, seg.duration,
         ctx.screenWidth, ctx.screenHeight,
+        (i) => this.segmentStartTime(i),
+        (i) => this.segmentEndTime(i),
       );
     }
 
     this.updateBgFill();
-    this.applyCameraFX(time);
+
+    // 逐句背景透明度覆盖（bgFill + background 层一起，语义同 effectOpacity）
+    const bgAlpha = shotOv?.bgOpacity ?? this._effectOpacity;
+    this.bgFill.alpha = bgAlpha;
+    const bgLayer = this.layers.get('background');
+    if (bgLayer) bgLayer.alpha = bgAlpha;
+
+    this.applyCameraFX(lyricClock);
 
     if (this.outlineRenderer && this.mediaElement) {
       this.outlineRenderer.update(this.mediaElement as HTMLVideoElement);
@@ -1164,7 +1324,9 @@ export class PVEngine {
   }
 
   get playbackTime(): number {
-    return this._playbackTime;
+    const dur = this.timelineDuration;
+    // 音频尾帧 currentTime 偶发略超 duration；显示/进度条一律钳住
+    return dur > 0 ? Math.min(this._playbackTime, dur) : this._playbackTime;
   }
 
   get timelineDuration(): number {

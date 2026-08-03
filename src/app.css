@@ -22,9 +22,90 @@ body {
 }
 
 #pv-container {
-  width: 100%;
-  height: 100%;
   position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+.stage-viewport {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+}
+
+.frame-area {
+  flex: 1;
+  min-height: 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
+}
+
+/* ─── Player bar（预览正下方，常规视频播放器布局）─── */
+
+.player-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: color-mix(in oklab, var(--color-base-200) 92%, transparent);
+  border-top: 1px solid color-mix(in oklab, var(--color-base-content) 8%, transparent);
+}
+
+.player-seek {
+  flex: 1;
+  min-width: 0;
+}
+
+.player-clock {
+  font-size: 0.72rem;
+  font-family: var(--font-mono, 'Courier New'), monospace;
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+  white-space: nowrap;
+}
+
+/* 句内循环徽标（聚焦某句歌词时显示，点击退出） */
+.loop-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+  border: 1px solid color-mix(in oklab, var(--color-primary) 35%, transparent);
+}
+
+.loop-chip:hover {
+  background: color-mix(in oklab, var(--color-primary) 25%, transparent);
+}
+
+body.pv-panels-hidden .player-bar {
+  display: none;
+}
+
+/* contain：在 stage 内按画幅 letterbox / pillarbox */
+.pv-frame[data-aspect='16:9'] {
+  aspect-ratio: 16 / 9;
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  height: auto;
+}
+
+.pv-frame[data-aspect='9:16'] {
+  aspect-ratio: 9 / 16;
+  width: min(100cqw, calc(100cqh * 9 / 16));
+  height: auto;
+}
+
+.pv-frame canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* ─── Sidebar layout ─── */
@@ -51,6 +132,11 @@ body {
 
 .sidebar-closed {
   display: none;
+}
+
+/* 分镜页需要双栏编辑空间：侧栏加宽 */
+.sidebar-wide {
+  width: min(1280px, 92vw);
 }
 
 .sidebar-header {
@@ -178,6 +264,8 @@ body {
   min-width: 0;
   position: relative;
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .collapsible-section {
@@ -402,6 +490,35 @@ textarea.textarea {
 
 /* ─── Still-image shot editor ─── */
 
+.shots-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.shots-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.shots-grid .shot-lines {
+  max-height: 56vh;
+}
+
+.shot-frame-disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.shot-line-loop {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 0.62rem;
+}
+
 .shots-empty {
   font-size: 0.72rem;
   color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
@@ -445,18 +562,44 @@ textarea.textarea {
 
 .shot-opt-row {
   display: flex;
-  gap: 6px;
+  gap: 8px 12px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .shot-opt {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
   font-size: 0.65rem;
   color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+}
+
+.shot-opt-select {
+  width: 9.5rem;
+  max-width: 9.5rem;
+}
+
+.shot-sliders {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
+  max-width: 28rem;
+}
+
+.shot-controls {
+  max-width: 36rem;
+}
+
+.shot-single-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+  cursor: pointer;
 }
 
 .shot-lines {
@@ -464,7 +607,30 @@ textarea.textarea {
   flex-direction: column;
   gap: 2px;
   max-height: 40vh;
+  overflow-x: hidden;
   overflow-y: auto;
+  /* 列方向 flex 容器里 overflow:auto 的子项会被压到 0 高，禁止收缩 */
+  flex-shrink: 0;
+}
+
+.shot-line-item {
+  position: relative;
+  overflow: visible;
+}
+
+/* 同分镜连线：按行高百分比从上一圆下缘接到当前圆上缘（gap=2px, dot=7px） */
+.shot-line-cont::before {
+  content: '';
+  position: absolute;
+  left: calc(6px + 3.5px);
+  top: calc(-50% - 2px + 3.5px);
+  height: calc(100% + 2px - 7px);
+  width: 3px;
+  margin-left: -1.5px;
+  background: var(--color-primary);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .shot-line {
@@ -478,6 +644,7 @@ textarea.textarea {
   text-align: left;
   color: color-mix(in oklab, var(--color-base-content) 75%, transparent);
   cursor: pointer;
+  overflow: visible;
 }
 
 .shot-line:hover {
@@ -485,11 +652,21 @@ textarea.textarea {
 }
 
 .shot-line-active {
-  background: color-mix(in oklab, var(--color-primary) 20%, transparent);
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+  color: var(--color-base-content);
+}
+
+/* 非单句模式：跟随进度的选中，无强调色 */
+.shot-line-current {
+  background: color-mix(in oklab, var(--color-base-content) 10%, transparent);
   color: var(--color-base-content);
 }
 
 .shot-line-dot {
+  position: relative;
+  z-index: 1;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -500,6 +677,12 @@ textarea.textarea {
 .shot-line-dot-set {
   background: var(--color-primary);
   border-color: var(--color-primary);
+}
+
+/* 沿用上一镜：空心主色点 */
+.shot-line-dot-inherit {
+  border-color: var(--color-primary);
+  background: transparent;
 }
 
 .shot-line-idx {
@@ -611,6 +794,15 @@ textarea.textarea {
   .effect-toggle {
     padding: 6px 0;
     font-size: 0.78rem;
+  }
+
+  .shots-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .shot-sliders {
+    grid-template-columns: 1fr;
+    max-width: none;
   }
 }
 
@@ -730,16 +922,15 @@ body.pv-panels-hidden .pv-footer {
 /* ─── Footer ─── */
 
 .pv-footer {
-  position: fixed;
-  bottom: 10px;
-  right: 14px;
   display: flex;
+  justify-content: flex-end;
   align-items: center;
   gap: 6px;
+  padding: 4px 14px 8px;
+  flex-shrink: 0;
   font-size: 10px;
   color: rgba(255, 255, 255, 0.25);
   letter-spacing: 0.06em;
-  z-index: 50;
   user-select: none;
   pointer-events: none;
 }

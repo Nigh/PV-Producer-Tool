@@ -54,13 +54,13 @@ export class LayeredText extends BaseEffect {
 
         layer.text.alpha = Math.min(1, elapsed * 5 * speed);
         layer.text.scale.set(layer.targetScale * eased * overshoot);
-        layer.blurFilter.blur = 0;
-        layer.text.filters = [];
+        layer.blurFilter.strength = 0;
+        layer.text.filters = null;
       } else {
         // Older layers: blur and fade
         const targetBlur = (depth + 1) * 4;
-        const currentBlur = layer.blurFilter.blur;
-        layer.blurFilter.blur = currentBlur + (targetBlur - currentBlur) * Math.min(1, ctx.deltaTime * 4);
+        const currentBlur = layer.blurFilter.strength;
+        layer.blurFilter.strength = currentBlur + (targetBlur - currentBlur) * Math.min(1, ctx.deltaTime * 4);
 
         const targetAlpha = Math.max(0.08, 0.55 - depth * 0.18);
         layer.text.alpha += (targetAlpha - layer.text.alpha) * Math.min(1, ctx.deltaTime * 3);
@@ -104,7 +104,7 @@ export class LayeredText extends BaseEffect {
     textObj.scale.set(0);
 
     const blurFilter = new PIXI.BlurFilter();
-    blurFilter.blur = 0;
+    blurFilter.strength = 0;
 
     this.container.addChild(textObj);
     this.textLayers.push({
@@ -120,6 +120,8 @@ export class LayeredText extends BaseEffect {
 
     while (this.textLayers.length > this.maxLayers) {
       const old = this.textLayers.shift()!;
+      old.text.filters = null;
+      try { old.blurFilter.destroy(); } catch { /* ignore */ }
       old.text.destroy(true);
     }
   }

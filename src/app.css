@@ -7,12 +7,22 @@
 :root {
   font-family: 'Noto Sans JP', var(--font-sans, 'Inter'), system-ui, sans-serif;
   line-height: 1.5;
+  color-scheme: dark;
+  --pv-line: color-mix(in oklab, var(--color-base-content) 11%, transparent);
+  --pv-line-strong: color-mix(in oklab, var(--color-base-content) 20%, transparent);
+  --pv-muted: color-mix(in oklab, var(--color-base-content) 62%, transparent);
+  --pv-panel: color-mix(in oklab, var(--color-base-200) 96%, var(--color-base-300));
 }
+
+[data-theme='xianii-light'] { color-scheme: light; }
+* { scrollbar-width: thin; scrollbar-color: var(--pv-line-strong) transparent; }
+::selection { background: color-mix(in oklab, var(--color-primary) 35%, transparent); }
+:focus-visible { outline: 2px solid var(--color-primary) !important; outline-offset: 2px; }
 
 html,
 body {
   overflow: hidden;
-  background: #000;
+  background: radial-gradient(circle at 50% 40%, #18191d 0, #090a0c 52%, #000 100%);
 }
 
 #app {
@@ -41,6 +51,7 @@ body {
   container-type: size;
   display: grid;
   place-items: center;
+  padding: clamp(12px, 2vw, 28px);
 }
 
 /* ─── Player bar（预览正下方，常规视频播放器布局）─── */
@@ -48,11 +59,16 @@ body {
 .player-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  background: color-mix(in oklab, var(--color-base-200) 92%, transparent);
-  border-top: 1px solid color-mix(in oklab, var(--color-base-content) 8%, transparent);
+  gap: 6px;
+  min-height: 52px;
+  padding: 8px clamp(12px, 2vw, 24px);
+  background: var(--pv-panel);
+  border-top: 1px solid var(--pv-line);
 }
+
+.player-icon-btn { width: 34px; height: 34px; min-height: 34px; padding: 7px; border-radius: 50%; }
+.player-icon-btn svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.player-play { color: var(--color-primary); background: color-mix(in oklab, var(--color-primary) 12%, transparent); }
 
 .player-seek {
   flex: 1;
@@ -64,6 +80,7 @@ body {
   font-family: var(--font-mono, 'Courier New'), monospace;
   color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* 句内循环徽标（聚焦某句歌词时显示，点击退出） */
@@ -123,9 +140,9 @@ body.pv-panels-hidden .player-bar {
   width: 640px;
   flex-shrink: 0;
   height: 100%;
-  background: var(--color-base-200);
+  background: var(--pv-panel);
   color: var(--color-base-content);
-  border-right: 1px solid color-mix(in oklab, var(--color-base-content) 10%, transparent);
+  border-right: 1px solid var(--pv-line);
   font-size: 0.95rem;
   z-index: 100;
 }
@@ -133,6 +150,8 @@ body.pv-panels-hidden .player-bar {
 .sidebar-closed {
   display: none;
 }
+
+.sidebar-scrim { display: none; }
 
 /* 分镜页需要双栏编辑空间：侧栏加宽 */
 .sidebar-wide {
@@ -142,14 +161,31 @@ body.pv-panels-hidden .player-bar {
 .sidebar-header {
   display: flex;
   align-items: center;
-  padding: 12px 16px 8px;
+  gap: 10px;
+  min-height: 64px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--pv-line);
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--color-primary);
+  color: var(--color-primary-content);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  box-shadow: 0 8px 22px color-mix(in oklab, var(--color-primary) 22%, transparent);
 }
 
 .sidebar-brand {
-  font-weight: bold;
-  letter-spacing: 0.5px;
-  font-size: 1.2rem;
-  color: var(--color-primary);
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  font-size: 1.02rem;
+  color: var(--color-base-content);
   line-height: 1.25;
 }
 
@@ -161,23 +197,31 @@ body.pv-panels-hidden .player-bar {
 }
 
 .nav-rail {
-  width: 128px;
+  width: 136px;
   flex-shrink: 0;
-  padding: 8px 6px;
+  padding: 12px 8px;
   overflow-y: auto;
-  border-right: 1px solid color-mix(in oklab, var(--color-base-content) 8%, transparent);
+  border-right: 1px solid var(--pv-line);
 }
 
 .nav-rail .menu .nav-item {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 1px;
-  padding: 6px 8px;
+  position: relative;
+  gap: 2px;
+  min-height: 48px;
+  padding: 8px 10px;
+  border-radius: 10px;
   line-height: 1.25;
   text-align: left;
   white-space: normal;
 }
+
+.nav-rail .menu .nav-item::before { content: ''; position: absolute; inset: 9px auto 9px 0; width: 2px; border-radius: 2px; background: transparent; }
+.nav-rail .menu .nav-item:hover { background: color-mix(in oklab, var(--color-base-content) 6%, transparent); }
+.nav-rail .menu .nav-item.menu-active { background: color-mix(in oklab, var(--color-primary) 11%, transparent); color: var(--color-base-content); }
+.nav-rail .menu .nav-item.menu-active::before { background: var(--color-primary); }
 
 .nav-item-title {
   font-size: 0.9rem;
@@ -187,21 +231,25 @@ body.pv-panels-hidden .player-bar {
 .nav-item-sub {
   font-size: 0.72rem;
   font-weight: 400;
-  opacity: 0.55;
+  color: var(--pv-muted);
   letter-spacing: 0.02em;
 }
 
 .nav-content {
   flex: 1;
   min-width: 0;
-  padding: 12px 16px;
+  padding: 18px 20px 28px;
   overflow-x: hidden;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   font-size: 0.95rem;
 }
+
+.panel-heading { display: grid; gap: 2px; padding-bottom: 14px; border-bottom: 1px solid var(--pv-line); }
+.panel-heading h1 { margin: 0; font-size: 1.12rem; font-weight: 750; letter-spacing: -0.025em; color: var(--color-base-content); }
+.panel-heading p { margin: 0; font-size: 0.76rem; color: var(--pv-muted); }
 
 /* 侧栏内容区：防止子项撑出横向滚动条；按钮边框可见 */
 .nav-content > * {
@@ -224,8 +272,12 @@ body.pv-panels-hidden .player-bar {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border-top: 1px solid color-mix(in oklab, var(--color-base-content) 8%, transparent);
+  min-height: 52px;
+  border-top: 1px solid var(--pv-line);
 }
+
+.sidebar-collapse::before { content: '\2190'; }
+.sidebar-expand::before { content: '\2192'; }
 
 .sidebar-collapse,
 .sidebar-expand {
@@ -249,6 +301,9 @@ body.pv-panels-hidden .player-bar {
 .sidebar-expand:hover {
   background: color-mix(in oklab, var(--color-base-content) 12%, transparent);
 }
+
+.sidebar-collapse:active,
+.sidebar-expand:active { transform: scale(0.96); }
 
 .sidebar-expand {
   position: fixed;
@@ -295,13 +350,12 @@ body.pv-panels-hidden .player-bar {
 }
 
 .panel-title {
-  font-size: 0.85rem;
-  font-weight: bold;
-  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid color-mix(in oklab, var(--color-base-content) 15%, transparent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--pv-muted);
+  letter-spacing: 0.02em;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--pv-line);
   margin-bottom: 2px;
 }
 
@@ -320,10 +374,12 @@ body.pv-panels-hidden .player-bar {
   gap: 4px;
   font-size: 0.8rem;
   font-weight: bold;
-  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  color: var(--pv-muted);
+  letter-spacing: 0.01em;
 }
+
+.nav-content :is(.input, .select, .textarea) { background: color-mix(in oklab, var(--color-base-100) 72%, transparent); border-color: var(--pv-line-strong); }
+.nav-content :is(.input, .select, .textarea):hover { border-color: color-mix(in oklab, var(--color-base-content) 32%, transparent); }
 
 textarea.textarea {
   resize: none;
@@ -447,7 +503,7 @@ textarea.textarea {
   font-weight: bold;
   color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
   cursor: pointer;
-  padding: 3px 0;
+  padding: 8px 0 6px;
   list-style: none;
   user-select: none;
   letter-spacing: 0.5px;
@@ -468,7 +524,8 @@ textarea.textarea {
 .effect-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 4px 12px;
+  gap: 2px 8px;
+  padding-bottom: 6px;
 }
 
 .effect-toggle {
@@ -478,11 +535,14 @@ textarea.textarea {
   font-size: 0.8rem;
   color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
   cursor: pointer;
-  padding: 3px 0;
+  padding: 6px 8px;
+  border-radius: 8px;
   transition: color 0.15s;
   flex-wrap: wrap;
   max-width: 100%;
 }
+
+.effect-toggle:hover { background: color-mix(in oklab, var(--color-base-content) 5%, transparent); }
 
 .effect-toggle:hover {
   color: var(--color-base-content);
@@ -537,7 +597,7 @@ textarea.textarea {
 .shot-thumb {
   width: 100%;
   height: auto;
-  border-radius: 4px;
+  border-radius: 12px;
   border: 1px solid color-mix(in oklab, var(--color-base-content) 15%, transparent);
 }
 
@@ -638,8 +698,9 @@ textarea.textarea {
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 4px 6px;
-  border-radius: 4px;
+  min-height: 34px;
+  padding: 6px 8px;
+  border-radius: 8px;
   font-size: 0.72rem;
   text-align: left;
   color: color-mix(in oklab, var(--color-base-content) 75%, transparent);
@@ -707,9 +768,9 @@ textarea.textarea {
 }
 
 .swatch {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   border: 1px solid color-mix(in oklab, var(--color-base-content) 20%, transparent);
   cursor: pointer;
   padding: 0;
@@ -725,7 +786,8 @@ textarea.textarea {
 
 .swatch-active {
   border-color: var(--color-primary);
-  box-shadow: 0 0 6px color-mix(in oklab, var(--color-primary) 60%, transparent);
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 55%, transparent);
+  outline-offset: 2px;
 }
 
 .swatch-auto {
@@ -791,6 +853,20 @@ textarea.textarea {
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
   }
 
+  .sidebar-scrim { display: block; position: fixed; inset: 0; z-index: 90; border: 0; background: rgba(0, 0, 0, 0.56); }
+  .sidebar-body { flex-direction: column; }
+  .nav-rail { width: 100%; padding: 8px; border-right: 0; border-bottom: 1px solid var(--pv-line); overflow-x: auto; overflow-y: hidden; }
+  .nav-rail .menu { display: flex; flex-direction: row; width: max-content; gap: 4px; }
+  .nav-rail .menu li { flex: none; }
+  .nav-rail .menu .nav-item { min-height: 40px; min-width: 84px; padding: 6px 10px; }
+  .nav-rail .menu .nav-item::before { inset: auto 10px 0; width: auto; height: 2px; }
+  .nav-item-sub { display: none; }
+  .nav-content { padding: 16px 16px 24px; }
+  .frame-area { padding: 8px; }
+  .player-bar { flex-wrap: wrap; gap: 4px; }
+  .player-seek { order: 2; flex-basis: calc(100% - 104px); }
+  .player-clock { order: 3; margin-left: auto; }
+
   .effect-toggle {
     padding: 6px 0;
     font-size: 0.78rem;
@@ -804,6 +880,10 @@ textarea.textarea {
     grid-template-columns: 1fr;
     max-width: none;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
 /* ─── Toast ─── */

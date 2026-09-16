@@ -46,12 +46,22 @@
 </script>
 
 <div class="player-bar">
-  <button class="btn btn-sm btn-ghost" title={t('lyric_prev')} aria-label={t('lyric_prev')} onclick={() => seekSegment(-1)}>⏮</button>
-  <button class="btn btn-sm btn-ghost" title={ui.paused ? t('play') : t('pause')} aria-label={ui.paused ? t('play') : t('pause')} onclick={togglePause}>{ui.paused ? '▶' : '⏸'}</button>
-  <button class="btn btn-sm btn-ghost" title={t('lyric_next')} aria-label={t('lyric_next')} onclick={() => seekSegment(1)}>⏭</button>
+  <button class="btn btn-sm btn-ghost player-icon-btn" title={t('lyric_prev')} aria-label={t('lyric_prev')} onclick={() => seekSegment(-1)}>
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4v12M15 5.5 7.5 10l7.5 4.5z" /></svg>
+  </button>
+  <button class="btn btn-sm btn-ghost player-icon-btn player-play" title={ui.paused ? t('play') : t('pause')} aria-label={ui.paused ? t('play') : t('pause')} onclick={togglePause}>
+    {#if ui.paused}
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 5 8 5-8 5z" /></svg>
+    {:else}
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 5v10M13 5v10" /></svg>
+    {/if}
+  </button>
+  <button class="btn btn-sm btn-ghost player-icon-btn" title={t('lyric_next')} aria-label={t('lyric_next')} onclick={() => seekSegment(1)}>
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15 4v12M5 5.5l7.5 4.5L5 14.5z" /></svg>
+  </button>
   {#if ui.focusedLine !== null && ui.singleLineEdit}
     <button class="loop-chip" title={t('loop_exit')} onclick={clearLineFocus}>
-      🔁 {t('loop_line')} {ui.focusedLine + 1} ✕
+      <span aria-hidden="true">↻</span> {t('loop_line')} {ui.focusedLine + 1} <span aria-hidden="true">×</span>
     </button>
   {/if}
   <input

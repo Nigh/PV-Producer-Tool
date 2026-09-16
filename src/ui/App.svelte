@@ -69,6 +69,7 @@
 <div class="app-shell">
   <aside class="sidebar" class:sidebar-closed={!sidebarOpen} class:sidebar-wide={active === 'shots'}>
     <div class="sidebar-header">
+      <span class="brand-mark" aria-hidden="true">PV</span>
       <span class="sidebar-brand">{t('brand_title')}</span>
     </div>
     <div class="sidebar-body">
@@ -79,6 +80,7 @@
               <button
                 class="nav-item"
                 class:menu-active={active === section.id}
+                aria-current={active === section.id ? 'page' : undefined}
                 onclick={() => { active = section.id; }}
               >
                 <span class="nav-item-title">{section.title}</span>
@@ -91,7 +93,10 @@
         </ul>
       </nav>
       <div class="nav-content">
-        <div class="panel-title">{activeSection.title}</div>
+        <header class="panel-heading">
+          <h1>{activeSection.title}</h1>
+          {#if activeSection.sub}<p>{activeSection.sub}</p>{/if}
+        </header>
         <activeSection.component />
       </div>
     </div>
@@ -101,7 +106,7 @@
         title={t('collapse')}
         aria-label={t('collapse')}
         onclick={() => { sidebarOpen = false; }}
-      >‹</button>
+      ></button>
       <div class="hide-hint">{t('hint_press')} <kbd class="kbd kbd-xs">H</kbd> {t('hint_hide_panels')}</div>
     </div>
   </aside>
@@ -112,7 +117,9 @@
       title={t('expand')}
       aria-label={t('expand')}
       onclick={() => { sidebarOpen = true; }}
-    >›</button>
+    ></button>
+  {:else}
+    <button class="sidebar-scrim" aria-label={t('collapse')} onclick={() => { sidebarOpen = false; }}></button>
   {/if}
 
   <main class="stage">

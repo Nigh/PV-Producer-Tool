@@ -168,17 +168,10 @@ body.pv-panels-hidden .player-bar {
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  background: var(--color-primary);
-  color: var(--color-primary-content);
-  font-size: 0.68rem;
-  font-weight: 900;
-  letter-spacing: -0.03em;
-  box-shadow: 0 8px 22px color-mix(in oklab, var(--color-primary) 22%, transparent);
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .sidebar-brand {

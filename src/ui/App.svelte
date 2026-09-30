@@ -65,7 +65,7 @@
 <div class="app-shell">
   <aside class="sidebar" class:sidebar-closed={!sidebarOpen} class:sidebar-wide={active === 'shots'}>
     <div class="sidebar-header">
-      <span class="brand-mark" aria-hidden="true">PV</span>
+      <img class="brand-mark" src={import.meta.env.BASE_URL + 'icon.png'} alt="" width="32" height="32" />
       <span class="sidebar-brand">{t('brand_title')}</span>
     </div>
     <div class="sidebar-body">

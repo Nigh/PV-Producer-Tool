@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="icon.png" alt="PV Producer Tool icon" width="128" />
+<img src="public/icon.png" alt="PV Producer Tool icon" width="128" />
 
-<img src="title.svg" alt="PV Producer Tool — Kinetic Typography &amp; Post-Processing for Music Videos" width="680" />
+<img src="public/logo.webp" alt="PV Producer Tool — Kinetic Typography &amp; Post-Processing for Music Videos" width="480" />
 
 </div>
 

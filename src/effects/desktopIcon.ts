@@ -96,8 +96,8 @@ export class DesktopIcon extends BaseEffect {
     
     // Icon background (gradient effect with two colors)
     const bgGradient = [
-      ['#b3d9ff', '#6bb3ff'],
-      ['#ffb3d9', '#ff80bf'],
+      [this.color('#b3d9ff'), this.color('#6bb3ff')],
+      [this.color('#ffb3d9'), this.color('#ff80bf')],
     ];
     const colors = bgGradient[0];
     
@@ -111,7 +111,7 @@ export class DesktopIcon extends BaseEffect {
     
     // Border
     g.rect(x, y, size, size);
-    g.stroke({ color: '#000000', width: 2 });
+    g.stroke({ color: this.color('#000000'), width: 2 });
     
     // Paint palette symbol (simplified)
     const paletteSize = size * 0.6;
@@ -119,10 +119,10 @@ export class DesktopIcon extends BaseEffect {
     const paletteY = y + (size - paletteSize) / 2;
     
     g.circle(paletteX + paletteSize / 2, paletteY + paletteSize / 2, paletteSize / 2);
-    g.fill({ color: '#ffffff', alpha: 0.9 });
+    g.fill({ color: this.color('#ffffff'), alpha: 0.9 });
     
     // Color dots on palette
-    const dotColors = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#a8e6cf'];
+    const dotColors = [this.color('#ff6b6b'), this.color('#4ecdc4'), this.color('#ffe66d'), this.color('#a8e6cf')];
     const dotSize = paletteSize / 8;
     for (let i = 0; i < 4; i++) {
       const angle = (i / 4) * Math.PI * 2 - Math.PI / 2;
@@ -140,11 +140,11 @@ export class DesktopIcon extends BaseEffect {
     
     // Paper background (yellow notepad)
     g.rect(x, y, size, size);
-    g.fill({ color: '#fffacd', alpha: 1 });
+    g.fill({ color: this.color('#fffacd'), alpha: 1 });
     
     // Border
     g.rect(x, y, size, size);
-    g.stroke({ color: '#000000', width: 2 });
+    g.stroke({ color: this.color('#000000'), width: 2 });
     
     // Folded corner
     const cornerSize = size * 0.25;
@@ -152,8 +152,8 @@ export class DesktopIcon extends BaseEffect {
     g.lineTo(x + size, y + cornerSize);
     g.lineTo(x + size - cornerSize, y + cornerSize);
     g.lineTo(x + size - cornerSize, y);
-    g.fill({ color: '#f0e68c', alpha: 1 });
-    g.stroke({ color: '#000000', width: 2 });
+    g.fill({ color: this.color('#f0e68c'), alpha: 1 });
+    g.stroke({ color: this.color('#000000'), width: 2 });
     
     // Lines on paper
     const lineCount = 4;
@@ -165,7 +165,7 @@ export class DesktopIcon extends BaseEffect {
       const lineY = lineStartY + i * lineSpacing;
       g.moveTo(x + lineMargin, lineY);
       g.lineTo(x + size - lineMargin, lineY);
-      g.stroke({ color: '#8b7355', width: 1.5, alpha: 0.6 });
+      g.stroke({ color: this.color('#8b7355'), width: 1.5, alpha: 0.6 });
     }
   }
 }

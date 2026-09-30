@@ -3,6 +3,8 @@
 
 import * as PIXI from 'pixi.js';
 import type { TemplateConfig, UpdateContext, ColorPalette, LayerType, MotionTargetInfo, LyricLine, Shot } from './types';
+import { resolveShotStyle, normalizePostFx } from './shotStyles';
+import type { EffectGroup, PostFxConfig } from './types';
 import type { AspectRatio } from './shotAspect';
 import { designSize } from './shotAspect';
 import { ShotCamera } from './shotCamera';
@@ -30,6 +32,11 @@ export class PVEngine {
     text: '#000000',
   };
   private currentTemplate: TemplateConfig | null = null;
+  private projectTemplate: TemplateConfig | null = null;
+  private activeGroup: EffectGroup | null = null;
+  private activeGroupKey = "";
+  private effectivePostFx: PostFxConfig = normalizePostFx();
+  private lastPostFxKey = "";
   private userText = '';
 
   private _animationSpeed = 2;
@@ -82,8 +89,6 @@ export class PVEngine {
   private _loading = false;
   /** 帧边界再重建：避免 resize/update 中途拆树导致 Pixi alphaMode 空引用崩溃。 */
   private _pendingTemplate: TemplateConfig | null = null;
-  private _pendingShotSwitch = false;
-  private _pendingShotSel: string | null = null;
   private _bgColorOverride: string | null = null;
   private _fontFamilyOverride: string | null = null;
   private _tick = 0;
@@ -200,6 +205,15 @@ export class PVEngine {
       // from ticker.deltaTime / maxFPS: Pixi normalises deltaTime against a
       // fixed 60fps target (Ticker.targetFPMS), so that conversion is only
       // correct at 60fps and breaks once previewFps throttles the ticker.
+      // Resolve the new clock before the frame-boundary rebuild, including seeks and loops.
+      if (this._loopSegment !== null && !this._paused) {
+        const start = this.segmentStartTime(this._loopSegment);
+        const end = this.segmentEndTime(this._loopSegment);
+        if (this._time >= end - 0.01 || this._time < start - 0.05) this.seek(start);
+      }
+      this.advanceLyric(this._time);
+      this.syncShotTemplate(this._time);
+      this.flushPendingTemplate();
       this.update(this._time, this._paused ? 0 : ticker.deltaMS / 1000);
     });
   }
@@ -208,9 +222,7 @@ export class PVEngine {
   /**
    * 当前已加载模板的原始配置引用。
    *
-   * UI 层用它作为保存/分享/Custom 编辑的模板基底，再叠加 engine 当前运行态
-   * slider 参数生成快照。这里刻意只暴露 getter，不在引擎内处理持久化逻辑，
-   * 保持 PVEngine 只负责渲染和运行状态。
+   * 只用于运行态调试；编辑和保存始终读取 UI 项目配置。
    */
   get currentTemplateConfig() { return this.currentTemplate; }
 
@@ -239,34 +251,18 @@ export class PVEngine {
    * 挂起模板重建，下一帧 ticker 开头执行。
    * resize 回调 / update 中途切模板必须走这里，禁止同步 destroy。
    */
-  scheduleTemplateReload(
-    template: TemplateConfig,
-    opts?: { shotSwitch?: boolean; appliedSel?: string | null },
-  ): void {
+  scheduleTemplateReload(template: TemplateConfig): void {
     this._pendingTemplate = template;
-    this._pendingShotSwitch = opts?.shotSwitch ?? false;
-    this._pendingShotSel = opts?.appliedSel ?? null;
   }
 
   private flushPendingTemplate(): void {
     if (!this._pendingTemplate || this._loading) return;
-    const tpl = this._pendingTemplate;
-    const shotSwitch = this._pendingShotSwitch;
-    const appliedSel = this._pendingShotSel;
+    const template = this._pendingTemplate;
     this._pendingTemplate = null;
-    this._pendingShotSwitch = false;
-    this._pendingShotSel = null;
-
-    this._shotTemplateSwitch = shotSwitch;
-    try {
-      this.loadTemplate(tpl);
-    } finally {
-      this._shotTemplateSwitch = false;
-    }
-    if (appliedSel !== null) this.onShotTemplateApplied?.(appliedSel);
+    this.loadTemplate(template, true);
   }
 
-  loadTemplate(template: TemplateConfig) {
+  loadTemplate(template: TemplateConfig, preserveRuntime = false) {
     if (this._loading) return;
     // 重建期间停 ticker，避免 destroy 与本帧后续 update/render 交错
     const wasTicking = this.app.ticker.started;
@@ -276,14 +272,18 @@ export class PVEngine {
     try {
       this.clearEffects();
       this.currentTemplate = template;
+      if (!preserveRuntime) {
+        this.projectTemplate = template;
+        this.activeGroupKey = JSON.stringify({ palette: template.palette, effects: template.effects, features: template.features });
+        this.lastPostFxKey = "";
+      }
       this.palette = { ...template.palette };
 
-      this.beat.bpm = template.bpm ?? 120;
-      if (template.animationSpeed !== undefined) {
-        this._animationSpeed = template.animationSpeed;
-      }
-      if (template.bgOpacity !== undefined) {
-        this.effectOpacity = template.bgOpacity;
+      if (!preserveRuntime) {
+        this.beat.bpm = template.bpm ?? 120;
+        this._animationSpeed = template.animationSpeed ?? 2;
+        this._motionIntensity = template.motionIntensity ?? 1;
+        this.effectOpacity = template.bgOpacity ?? 1;
       }
       this._outlineEnabled = template.features?.mediaOutline ?? false;
       this._motionDetectionEnabled = template.features?.motionDetection ?? false;
@@ -305,6 +305,7 @@ export class PVEngine {
       this.updateBgFill();
 
       for (const entry of template.effects) {
+        if (entry.enabled === false) continue;
         const layer = this.layers.get(entry.layer);
         if (!layer) continue;
 
@@ -321,24 +322,22 @@ export class PVEngine {
         }
 
         try {
-          const effect = createEffect(entry.type, layer, config, this.palette, this.app.renderer);
+          const effect = createEffect(entry.type, layer, config, { ...this.palette, ...entry.palette }, this.app.renderer);
           this.activeEffects.push(effect);
         } catch (err) {
           console.warn(`[PVEngine] Failed to create effect "${entry.type}":`, err);
         }
       }
 
-      if (template.postfx) {
-        this._shake = template.postfx.shake ?? 0;
-        this._zoom = template.postfx.zoom ?? 0;
-        this._tilt = template.postfx.tilt ?? 0;
-        this.glitch = template.postfx.glitch ?? 0;
-        this.hueShift = template.postfx.hueShift ?? 0;
+      if (!preserveRuntime) {
+        this._shake = template.postfx?.shake ?? 0;
+        this._zoom = template.postfx?.zoom ?? 0;
+        this._tilt = template.postfx?.tilt ?? 0;
+        this.glitch = template.postfx?.glitch ?? 0;
+        this.hueShift = template.postfx?.hueShift ?? 0;
       }
 
-      if (template.shots && !this._shotTemplateSwitch) {
-        this.setShots(template.shots);
-      }
+      if (!preserveRuntime) this.setShots(template.shots ?? []);
 
       this.syncOutline();
       this.syncResolution();
@@ -359,7 +358,7 @@ export class PVEngine {
       this.textSegments = [''];
     }
     if (this.currentTemplate) {
-      this.loadTemplate(this.currentTemplate);
+      this.loadTemplate(this.currentTemplate, true);
     }
   }
 
@@ -537,7 +536,7 @@ export class PVEngine {
     this.textSegments = [this.userText];
 
     if (this.currentTemplate) {
-      this.loadTemplate(this.currentTemplate);
+      this.loadTemplate(this.currentTemplate, true);
     }
   }
 
@@ -748,7 +747,7 @@ export class PVEngine {
       }
     }
     if (this.currentTemplate) {
-      this.loadTemplate(this.currentTemplate);
+      this.loadTemplate(this.currentTemplate, true);
     }
   }
 
@@ -821,7 +820,7 @@ export class PVEngine {
     this._fontFamilyOverride = font;
     // Effects bake fontFamily into their text objects at setup, so the
     // only way to apply the override is to rebuild the current template.
-    if (this.currentTemplate) this.loadTemplate(this.currentTemplate);
+    if (this.currentTemplate) this.loadTemplate(this.currentTemplate, true);
   }
   get fontFamily() { return this._fontFamilyOverride; }
 
@@ -955,7 +954,7 @@ export class PVEngine {
         this.extractingColors = true;
         this.applyExtractedColors();
         this._loading = false;
-        this.loadTemplate(this.currentTemplate);
+        this.loadTemplate(this.currentTemplate, true);
         this.extractingColors = false;
         return;
       }
@@ -1164,62 +1163,42 @@ export class PVEngine {
     return idx >= 0 ? this._shots[idx] ?? null : null;
   }
 
-  /**
-   * 当前句生效的模板选择值：本句未设则向前回退到最近定义（与取景框
-   * resolveSlot 同语义）；全部未设返回 null（保持当前模板）。
-   */
-  private effectiveShotTemplate(lyricClock: number): string | null {
-    const idx = this.currentSegmentInfo(lyricClock).index;
-    for (let i = Math.min(idx, this._shots.length - 1); i >= 0; i--) {
-      const tpl = this._shots[i]?.template;
-      if (tpl !== undefined) return tpl;
-    }
-    return null;
+  /** Project configuration is separate from the currently rendered checkpoint. */
+  setProjectTemplate(template: TemplateConfig): void {
+    this.projectTemplate = template;
+    this.activeGroup = null;
+    if (JSON.stringify(template.shots ?? []) !== JSON.stringify(this._shots)) this.setShots(template.shots ?? []);
   }
-
-  /** UI 注入：把模板选择值（'0' | 'user-N'）解析成配置。 */
-  templateResolver: ((sel: string) => TemplateConfig | null) | null = null;
-  /** 逐句模板实际切换时回调（UI 同步下拉/勾选状态）。 */
-  onShotTemplateApplied: ((sel: string) => void) | null = null;
-  private _activeShotTemplateSel: string | null = null;
 
   private syncShotTemplate(lyricClock: number): void {
-    if (!this.templateResolver) return;
-    const sel = this.effectiveShotTemplate(lyricClock);
-    if (sel === null || sel === this._activeShotTemplateSel) return;
-    const config = this.templateResolver(sel);
-    if (!config) return;
-    // 占位，避免每帧重复排队；真正 load 延到下一帧 ticker 开头
-    this._activeShotTemplateSel = sel;
-    this.scheduleTemplateReload(config, { shotSwitch: true, appliedSel: sel });
-  }
-  private _shotTemplateSwitch = false;
-
-  /** 外部直接换模板（模板管理/URL）后重置逐句追踪，避免误判未变。 */
-  resetShotTemplateTracking(sel: string | null = null): void {
-    this._activeShotTemplateSel = sel;
+    const project = this.projectTemplate;
+    if (!project) return;
+    const index = this.currentSegmentInfo(lyricClock).index;
+    const resolved = resolveShotStyle(project, index, this.lyricLineCount);
+    const group = resolved.effects.value;
+    // Default group is assembled by the resolver; retain its stable project identity.
+    const stableGroup = resolved.effects.source < 0 ? project : group;
+    if (stableGroup !== this.activeGroup) {
+      this.activeGroup = stableGroup;
+      const key = JSON.stringify(group);
+      if (key !== this.activeGroupKey) {
+        this.activeGroupKey = key;
+        this.scheduleTemplateReload({ ...project, ...group, features: group.features });
+      }
+    }
+    this.effectivePostFx = resolved.postfx.value;
+    const postKey = JSON.stringify(this.effectivePostFx);
+    if (postKey !== this.lastPostFxKey) {
+      this.lastPostFxKey = postKey;
+      this.glitchFilter.intensity = this.effectivePostFx.glitch;
+      this.hueFilter.reset();
+      this.hueFilter.hue(this.effectivePostFx.hueShift, false);
+    }
   }
 
   private update(time: number, deltaTime: number) {
-    let lyricClock = this._npActive
-      ? this._npTime
-      : this.beat.isAudioMode
-        ? this.beat.currentTime
-        : time;
-
-    // 句内循环：越过句尾（或被拖到句首之前）就跳回句首
-    if (this._loopSegment !== null && !this._paused) {
-      const start = this.segmentStartTime(this._loopSegment);
-      const end = this.segmentEndTime(this._loopSegment);
-      if (lyricClock >= end - 0.01 || lyricClock < start - 0.05) {
-        this.seek(start);
-        lyricClock = start;
-      }
-    }
+    const lyricClock = time;
     this._playbackTime = lyricClock;
-
-    // 逐句模板切换须在构建 ctx / 遍历特效之前完成
-    this.syncShotTemplate(lyricClock);
     const shotOv = this.currentShotOverride(lyricClock);
 
     if (this.motionDetector && this.mediaElement instanceof HTMLVideoElement) {
@@ -1231,10 +1210,6 @@ export class PVEngine {
       );
     }
 
-    // Advance lyricCursor first; getDisplayText / getSegmentTime then
-    // both read it as pure functions (call order in the ctx literal no
-    // longer matters).
-    this.advanceLyric(lyricClock);
     const ctx: UpdateContext = {
       time,
       deltaTime,
@@ -1288,7 +1263,7 @@ export class PVEngine {
     for (const effect of this.activeEffects) {
       try {
         if (heavySkip && effect.heavy && this._tick % heavySkip !== 0) continue;
-        effect.update(ctx);
+        effect.update({ ...ctx, palette: effect.effectivePalette });
       } catch (err) {
         console.warn(`[PVEngine] Effect "${effect.name}" update error:`, err);
       }
@@ -1306,15 +1281,15 @@ export class PVEngine {
     let px = cx, py = cy;
 
     const beatShake = this.beat.getIntensity(time) * this._beatReactivity;
-    const totalShake = this._shake + beatShake * 0.15;
+    const totalShake = this.effectivePostFx.shake + beatShake * 0.15;
     if (totalShake > 0 && !this._paused) {
       px += (Math.random() - 0.5) * totalShake * 30;
       py += (Math.random() - 0.5) * totalShake * 20;
     }
 
     this.app.stage.position.set(px, py);
-    this.app.stage.scale.set(1 + this._zoom * 0.5);
-    this.app.stage.rotation = this._tilt * 0.3;
+    this.app.stage.scale.set(1 + this.effectivePostFx.zoom * 0.5);
+    this.app.stage.rotation = this.effectivePostFx.tilt * 0.3;
 
     this.glitchFilter.time = time;
   }

@@ -12,9 +12,32 @@ export interface ColorPalette {
 }
 
 export interface EffectEntry {
+  id?: string;
+  enabled?: boolean;
+  palette?: Partial<ColorPalette>;
   type: string;
   layer: LayerType;
   config: Record<string, any>;
+}
+
+export interface PostFxConfig {
+  shake: number;
+  zoom: number;
+  tilt: number;
+  glitch: number;
+  hueShift: number;
+}
+
+export interface EffectGroup {
+  palette: ColorPalette;
+  effects: EffectEntry[];
+  features?: TemplateConfig['features'];
+}
+
+/** Appearance checkpoints are independent from camera checkpoints. */
+export interface ShotStyle {
+  effects?: EffectGroup;
+  postfx?: PostFxConfig;
 }
 
 export interface TemplateConfig {
@@ -24,14 +47,9 @@ export interface TemplateConfig {
   effects: EffectEntry[];
   bpm?: number;
   animationSpeed?: number;
+  motionIntensity?: number;
   bgOpacity?: number;
-  postfx?: {
-    shake?: number;
-    zoom?: number;
-    tilt?: number;
-    glitch?: number;
-    hueShift?: number;
-  };
+  postfx?: Partial<PostFxConfig>;
   features?: {
     mediaOutline?: boolean;
     autoExtractColors?: boolean;
@@ -41,6 +59,9 @@ export interface TemplateConfig {
   };
   /** 静止画 MAD 分镜列表，按歌词行/文本段索引对齐（可稀疏，null 槽位表示沿用上一镜）。 */
   shots?: (Shot | null)[];
+  shotStyles?: (ShotStyle | null)[];
+  /** Timestamped lyrics travel with saved shot projects; media files remain local. */
+  lrc?: string;
 }
 
 /** 分镜取景框，归一化到原图尺寸（0..1）。 */

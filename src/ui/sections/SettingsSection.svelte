@@ -61,6 +61,15 @@
   function onAspectChange(e: Event) {
     setAspectRatio((e.currentTarget as HTMLSelectElement).value as AspectRatio);
   }
+
+  function resetGlobalEffects() {
+    ui.speed = ui.project?.animationSpeed ?? 2;
+    ui.motion = ui.project?.motionIntensity ?? 1;
+    ui.opacity = ui.project?.bgOpacity ?? 1;
+    engine.animationSpeed = ui.speed;
+    engine.motionIntensity = ui.motion;
+    engine.effectOpacity = ui.opacity;
+  }
 </script>
 
 <div class="control-group">
@@ -99,6 +108,32 @@
   </div>
 {/if}
 
+<section class="settings-block" aria-labelledby="global-effects-title">
+  <div class="settings-block-heading">
+    <div>
+      <h2 id="global-effects-title">{t('global_effects')}</h2>
+      <p>{t('global_effects_hint')}</p>
+    </div>
+    <button type="button" class="btn btn-xs" onclick={resetGlobalEffects}>{t('reset_global_effects')}</button>
+  </div>
+  <Slider label={t('anim_speed')} display={`${ui.speed.toFixed(1)}x`}
+    min={0} max={4} step={0.1} bind:value={ui.speed}
+    defaultValue={ui.project?.animationSpeed ?? 2}
+    oninput={() => { engine.animationSpeed = ui.speed; }}
+    onreset={() => { ui.speed = ui.project?.animationSpeed ?? 2; engine.animationSpeed = ui.speed; }} />
+  <Slider label={t('motion_intensity')} display={`${ui.motion.toFixed(1)}x`}
+    min={0} max={2} step={0.1} bind:value={ui.motion}
+    defaultValue={ui.project?.motionIntensity ?? 1}
+    oninput={() => { engine.motionIntensity = ui.motion; }}
+    onreset={() => { ui.motion = ui.project?.motionIntensity ?? 1; engine.motionIntensity = ui.motion; }} />
+  <Slider label={t('bg_opacity')} display={`${Math.round(ui.opacity * 100)}%`}
+    min={0} max={1} step={0.05} bind:value={ui.opacity}
+    defaultValue={ui.project?.bgOpacity ?? 1}
+    oninput={() => { engine.effectOpacity = ui.opacity; }}
+    onreset={() => { ui.opacity = ui.project?.bgOpacity ?? 1; engine.effectOpacity = ui.opacity; }} />
+</section>
+
+<h2 class="settings-subheading">{t('beat_settings')}</h2>
 <div class="control-group">
   <label for="fps-select">{t('preview_fps')} <span class="opacity-70">{ui.fpsActual ? `(${ui.fpsActual} fps)` : ''}</span></label>
   <select id="fps-select" class="select select-sm w-full" bind:value={ui.fps} onchange={() => { engine.previewFps = ui.fps; }}>
@@ -113,16 +148,20 @@
   label={t('bpm')} display={String(ui.bpm)}
   min={30} max={240} step={1} bind:value={ui.bpm}
   oninput={() => { engine.beat.bpm = ui.bpm; }}
+  defaultValue={ui.project?.bpm ?? 120}
+  onreset={() => { ui.bpm = ui.project?.bpm ?? 120; engine.beat.bpm = ui.bpm; }}
 />
 <Slider
   label={t('beat_offset')} display={`${ui.beatOffset.toFixed(2)} ${t('beat_unit')}`}
   min={0} max={1} step={0.01} bind:value={ui.beatOffset}
   oninput={() => setBeatOffset(ui.beatOffset)}
+  defaultValue={0} onreset={() => setBeatOffset(0)}
 />
 <Slider
   label={t('beat_react')} display={ui.beatReact.toFixed(2)}
   min={0} max={1} step={0.05} bind:value={ui.beatReact}
   oninput={() => { engine.beatReactivity = ui.beatReact; }}
+  defaultValue={0.5} onreset={() => { ui.beatReact = 0.5; engine.beatReactivity = 0.5; }}
 />
 
 {#if locale === 'zh'}
@@ -134,3 +173,8 @@
     </label>
   </div>
 {/if}
+
+<div class="control-group"><label for="canvas-color">{t('canvas_color')}</label>
+  <div class="instance-actions"><input id="canvas-color" type="color" value={ui.canvasColor || ui.project.palette.background} oninput={e => { ui.canvasColor = e.currentTarget.value; engine.canvasColor = ui.canvasColor; }} />
+    <button class="btn btn-xs" onclick={() => { ui.canvasColor = ''; engine.canvasColor = null; }}>{t('follow_template')}</button></div>
+</div>

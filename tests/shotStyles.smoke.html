@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<!-- PV Tool — Copyright (c) 2026 DanteAlighieri13210914
+     Licensed under Non-Commercial License. See LICENSE for terms. -->
+<html lang="en"><head><meta charset="UTF-8"><title>Shot styles smoke</title></head>
+<body><div id="stage" style="width:640px;height:360px"></div><pre id="result">Running…</pre>
+<script type="module">
+  import { PVEngine } from '../src/core/engine.ts';
+  import { cloneConfig, effectGroup, normalizePostFx } from '../src/core/shotStyles.ts';
+  import { effectParameters } from '../src/core/effectParameters.ts';
+  import { effectCatalog } from '../src/core/effectCatalog.ts';
+  import { initApp, ui, engine as editorEngine, applyTextInput, focusLine, editEffects, editPostFx, editorStyle, exitLineLoop, getCurrentTemplateSnapshot, selectTemplate, flushProject } from '../src/ui/store.svelte.ts';
+  const assert = (condition, message) => { if (!condition) throw new Error(message); };
+  const frame = () => new Promise(resolve => setTimeout(resolve, 160));
+  const base = { name: 'smoke', palette: { background: '#000000', primary: '#ff0000', secondary: '#00ff00', accent: '#0000ff', text: '#ffffff' },
+    effects: [{ id: 'red', type: 'concentricCircles', layer: 'decoration', config: { color: '$primary', count: 2 } }],
+    postfx: normalizePostFx({ zoom: 0.2 }), features: { invertMedia: true } };
+  const engine = new PVEngine();
+  try {
+    await engine.init(document.getElementById('stage'));
+    engine.setLyricTimeline(Array.from({ length: 8 }, (_, i) => ({ time: i * 3, text: 'line ' + i })));
+    engine.loadTemplate(base); engine.pause();
+    const group = cloneConfig(effectGroup(base));
+    delete group.features;
+    group.effects.push({ id: 'blue', type: 'concentricCircles', layer: 'decoration', config: { color: '$primary', count: 2 }, palette: { primary: '#0000ff' } });
+    const project = { ...base, shotStyles: [null, { postfx: normalizePostFx({ zoom: 0.4 }) }, { effects: group }, null, null,
+      { effects: { palette: base.palette, effects: [] }, postfx: normalizePostFx() }] };
+    const imageCanvas = document.createElement('canvas'); imageCanvas.width = 320; imageCanvas.height = 180;
+    const context = imageCanvas.getContext('2d'); context.fillStyle = '#00ff00'; context.fillRect(0, 0, 320, 180);
+    const imageBlob = await new Promise(resolve => imageCanvas.toBlob(resolve));
+    await engine.addMedia(new File([imageBlob], 'style-smoke.png', { type: 'image/png' }), 'fit');
+    project.shots = [{ rect: { x: 0, y: 0, w: 1, h: 1 }, motion: 'zoomIn', in: 'cut' }, null, null, null, null, null, null, null];
+    engine.setProjectTemplate(project); engine.seek(7); await frame();
+    assert(engine.activeEffects.length === 2, 'paused edit applies');
+    assert(!engine.currentTemplateConfig.features, 'shot group clears global media features');
+    assert(engine.activeEffects[0].effectivePalette.primary === '#ff0000', 'first palette');
+    assert(engine.activeEffects[1].effectivePalette.primary === '#0000ff', 'instance palette isolation');
+    assert(engine.activeEffects[1].config.color === '#0000ff', 'palette tokens resolve per instance');
+    const first = engine.activeEffects[0]; engine.seek(13); await frame();
+    assert(engine.activeEffects[0] === first, 'inherited effects do not rebuild');
+    engine.seek(19); await frame();
+    assert(engine.activeEffects.length === 0, 'explicit empty effects');
+    assert(engine.effectivePostFx.zoom === 0, 'explicit zero postfx');
+    engine.seek(0); await frame();
+    assert(engine.activeEffects.length === 1, 'backward seek restores default');
+    assert(engine.currentTemplateConfig.features.invertMedia, 'backward seek restores global media features');
+    assert(engine.effectivePostFx.zoom === 0.2, 'backward seek restores postfx default');
+    const afterSeek = engine.activeEffects[0]; project.postfx = normalizePostFx({ zoom: 0.7 });
+    const cameraTexture = engine.shotCamera.curSprite.texture;
+    engine.setProjectTemplate(project); await frame();
+    assert(engine.activeEffects[0] === afterSeek, 'postfx edit does not rebuild effects');
+    assert(engine.effectivePostFx.zoom === 0.7, 'paused postfx edit applies');
+    assert(engine.shotCamera.curSprite.texture === cameraTexture, 'style edits preserve camera texture');
+    engine.destroy();
+    await initApp(document.getElementById('stage')); editorEngine.pause();
+    assert(applyTextInput(Array.from({ length: 8 }, (_, i) => `[00:${String(i * 3).padStart(2, '0')}.00]line ${i}`).join('\n')), 'accept eight lyric lines');
+    ui.singleLineEdit = true; focusLine(2);
+    editEffects(g => { g.effects.push({ type: 'pixelWindow', layer: 'decoration', config: { windowsData: [{ title: 'A', bgColor: '#ffffff' }] } }); });
+    editPostFx('zoom', 0.6); flushProject(); await frame();
+    assert(editorStyle().effects.source === 2 && editorStyle().postfx.source === 2, 'editor creates independent checkpoints');
+    const saved = getCurrentTemplateSnapshot().config;
+    assert(saved.lrc.includes('line 7') && saved.shotStyles[2].effects.effects.at(-1).config.windowsData[0].title === 'A', 'save retains lyrics and nested properties');
+    assert((saved.postfx?.zoom ?? 0) !== 0.6, 'save retains global default instead of active shot postfx');
+    exitLineLoop(); editorEngine.seek(0); await frame();
+    assert(ui.focusedLine === 2 && editorEngine.loopSegment === null, 'loop exit and seeking retain editing selection');
+    const oldConfirm = window.confirm; window.confirm = () => false;
+    assert(!applyTextInput('[00:00.00]only one') && editorEngine.lyricLineCount === 8, 'declining trim preserves settings');
+    window.confirm = oldConfirm;
+    ui.sharedTemplate = saved; selectTemplate('shared', false); await frame();
+    assert(editorEngine.lyricLineCount === 8 && ui.project.shotStyles[2].postfx.zoom === 0.6, 'opening saved project restores timeline and checkpoints');
+    window.confirm = () => true; assert(applyTextInput(''), 'empty lyrics accepted'); window.confirm = oldConfirm;
+    assert(editorEngine.lyricLineCount === 0 && ui.focusedLine === null, 'no lyrics keeps default editor available');
+    for (const preset of effectCatalog) assert(Object.keys(effectParameters(preset)).length > 0, 'parameter coverage: ' + preset.type);
+    editorEngine.destroy();
+    document.getElementById('result').textContent = 'SHOT-STYLES-SMOKE-PASS';
+    console.log('SHOT-STYLES-SMOKE-PASS');
+  } catch (error) {
+    document.getElementById('result').textContent = 'SHOT-STYLES-SMOKE-FAIL: ' + error.message;
+    console.error(error);
+  } finally { if (engine.app?.renderer) engine.destroy(); if (editorEngine.app?.renderer) editorEngine.destroy(); }
+</script></body></html>

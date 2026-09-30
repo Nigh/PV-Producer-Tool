@@ -3,113 +3,41 @@
 <script lang="ts">
   import { t } from '../../i18n';
   import { templates } from '../../templates';
-  import {
-    ui, tplName, selectTemplate, isCustomMode,
-    deleteSelectedTemplate, exportShareCode, saveCustomAs, importShareCode,
-  } from '../store.svelte';
-
+  import { saveCustomTemplates } from '../../core/templateStore';
+  import { ui, tplName, applyStyleTemplate, saveEffectGroup, saveCustomAs, exportShareCode, importShareCode, selectTemplate } from '../store.svelte';
+  let picked = $state('0');
+  let name = $state('');
+  let code = $state('');
+  let importing = $state(false);
+  let invalid = $state(false);
   let deleteConfirm = $state(false);
-  let saveOpen = $state(false);
-  let saveName = $state('');
-  let importOpen = $state(false);
-  let importCode = $state('');
-  let importError = $state(false);
-
-  const isUserTemplate = $derived(ui.selected.startsWith('user-'));
-
-  const templateOptions = $derived([
-    ...templates.map((tp, i) => ({ value: String(i), label: tplName(tp) })),
-    ...ui.customTemplates.map((tp, i) => ({ value: `user-${i}`, label: `⭐ ${tp.name}` })),
-    ...(ui.sharedTemplate ? [{ value: 'shared', label: `↗ ${ui.sharedTemplate.name}` }] : []),
-    { value: 'custom', label: t('custom') },
+  const options = $derived([
+    ...templates.map((tpl, index) => ({ value: String(index), label: tplName(tpl) })),
+    ...ui.customTemplates.map((tpl, index) => ({ value: 'user-' + index, label: tpl.name })),
+    ...(ui.sharedTemplate ? [{ value: 'shared', label: ui.sharedTemplate.name }] : []),
   ]);
-
-  function pickTemplate(value: string) {
-    deleteConfirm = false;
-    selectTemplate(value);
-  }
-
-  function doSave() {
-    const name = saveName.trim();
-    if (!name) return;
-    saveCustomAs(name);
-    saveOpen = false;
-    saveName = '';
-  }
-
-  async function doImport() {
-    const code = importCode.trim();
-    if (!code) return;
-    try {
-      await importShareCode(code);
-      importOpen = false;
-      importError = false;
-      importCode = '';
-    } catch (err) {
-      importError = true;
-      console.warn('[PV] Share code decode failed:', err);
-    }
+  async function loadCode() { try { await importShareCode(code.trim()); importing = false; invalid = false; } catch { invalid = true; } }
+  function removeTemplate() {
+    if (!picked.startsWith('user-')) return;
+    ui.customTemplates.splice(Number(picked.slice(5)), 1);
+    saveCustomTemplates($state.snapshot(ui.customTemplates)); picked = '0'; deleteConfirm = false;
   }
 </script>
-
-<div class="control-group">
-  <div class="template-buttons">
-    {#each templateOptions as opt (opt.value)}
-      <button
-        class="btn btn-xs {ui.selected === opt.value ? 'btn-primary' : 'btn-neutral'}"
-        onclick={() => pickTemplate(opt.value)}
-      >{opt.label}</button>
-    {/each}
-  </div>
-</div>
-
-<div class="control-group">
-  <div class="template-actions">
-    {#if isCustomMode()}
-      <button class="btn btn-xs" title={t('save_tpl')} onclick={() => { saveOpen = true; saveName = ''; }}>{t('save_tpl')}</button>
-    {/if}
-    <button class="btn btn-xs" title={t('import_code')} onclick={() => { importOpen = true; importError = false; importCode = ''; }}>{t('import_code')}</button>
-    {#if isUserTemplate}
-      <button class="btn btn-xs" onclick={exportShareCode}>{t('export_code')}</button>
-      <button class="btn btn-xs" onclick={() => { deleteConfirm = true; }}>{t('delete_tpl')}</button>
-    {/if}
-  </div>
-
-  {#if deleteConfirm && isUserTemplate}
-    <div class="tpl-inline-input">
-      <span class="tpl-confirm-text">
-        {t('confirm_delete')} "{ui.customTemplates[parseInt(ui.selected.split('-')[1])]?.name}"？
-      </span>
-      <button class="btn btn-xs btn-error" onclick={() => { deleteConfirm = false; deleteSelectedTemplate(); }}>{t('delete_tpl')}</button>
-      <button class="btn btn-xs" onclick={() => { deleteConfirm = false; }}>{t('cancel')}</button>
-    </div>
-  {/if}
-
-  {#if saveOpen}
-    <div class="tpl-inline-input">
-      <!-- svelte-ignore a11y_autofocus -->
-      <input
-        type="text" class="input input-sm flex-1" placeholder={t('tpl_name_placeholder')}
-        autofocus
-        bind:value={saveName}
-        onkeydown={(e) => {
-          if (e.key === 'Enter') doSave();
-          if (e.key === 'Escape') saveOpen = false;
-        }}
-      />
-      <button class="btn btn-xs" onclick={doSave}>{t('confirm')}</button>
-      <button class="btn btn-xs" onclick={() => { saveOpen = false; }}>{t('cancel')}</button>
-    </div>
-  {/if}
-
-  {#if importOpen}
-    <label for="share-code-text" class:label-error={importError}>
-      {importError ? t('code_invalid') : t('import_code')}
-    </label>
-    <input id="share-code-text" type="text" class="input input-sm w-full font-mono" placeholder={t('paste_code')} bind:value={importCode} />
-    <div class="template-actions">
-      <button class="btn btn-xs" onclick={doImport}>{t('confirm')}</button>
-      <button class="btn btn-xs" onclick={() => { importOpen = false; }}>{t('cancel')}</button>
-    </div>
-  {/if}
+<div class="template-tools">
+  <label for="style-template">{t('shot_template')}</label>
+  <select id="style-template" class="select select-sm w-full" bind:value={picked} onchange={() => { deleteConfirm = false; }}>
+    {#each options as option (option.value)}<option value={option.value}>{option.label}</option>{/each}
+  </select>
+  <div class="instance-actions"><button class="btn btn-xs" onclick={() => applyStyleTemplate(picked)}>{t('apply_effects')}</button>
+    <button class="btn btn-xs" onclick={() => applyStyleTemplate(picked, true)}>{t('apply_effects_postfx')}</button></div>
+  <input class="input input-sm w-full" aria-label={t('tpl_name_placeholder')} placeholder={t('tpl_name_placeholder')} bind:value={name} />
+  <div class="instance-actions"><button class="btn btn-xs" disabled={!name.trim()} onclick={() => saveEffectGroup(name.trim())}>{t('save_effect_group')}</button>
+    <button class="btn btn-xs" disabled={!name.trim()} onclick={() => saveCustomAs(name.trim())}>{t('save_project')}</button></div>
+  <div class="instance-actions"><button class="btn btn-xs" onclick={exportShareCode}>{t('share_project')}</button>
+    <button class="btn btn-xs" onclick={() => { importing = !importing; }}>{t('import_code')}</button>
+    {#if picked.startsWith('user-')}<button class="btn btn-xs" onclick={() => { deleteConfirm = true; }}>{t('delete_tpl')}</button>
+      <button class="btn btn-xs" onclick={() => { if (window.confirm(t('replace_project_confirm'))) selectTemplate(picked); }}>{t('open_project')}</button>{/if}</div>
+  {#if deleteConfirm}<div class="instance-actions"><span>{t('confirm_delete')}</span><button class="btn btn-xs btn-error" onclick={removeTemplate}>{t('delete_tpl')}</button><button class="btn btn-xs" onclick={() => { deleteConfirm = false; }}>{t('cancel')}</button></div>{/if}
+  {#if importing}<label for="project-code">{t('import_replaces_project')}</label><input id="project-code" class="input input-sm w-full" bind:value={code} placeholder={t('paste_code')} />
+    {#if invalid}<p role="alert">{t('code_invalid')}</p>{/if}<button class="btn btn-xs" disabled={!code.trim()} onclick={loadCode}>{t('confirm')}</button>{/if}
 </div>

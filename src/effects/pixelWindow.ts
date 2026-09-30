@@ -107,7 +107,7 @@ export class PixelWindow extends BaseEffect {
       iconG.clear();
       // X button background
       iconG.rect(btnX, btnY, btnSize, btnSize);
-      iconG.fill({ color: '#ffffff', alpha: 0.3 });
+      iconG.fill({ color: this.color('#ffffff'), alpha: 0.3 });
       
       // X mark
       const xPad = 4;
@@ -115,7 +115,7 @@ export class PixelWindow extends BaseEffect {
       iconG.lineTo(btnX + btnSize - xPad, btnY + btnSize - xPad);
       iconG.moveTo(btnX + btnSize - xPad, btnY + xPad);
       iconG.lineTo(btnX + xPad, btnY + btnSize - xPad);
-      iconG.stroke({ color: '#ffffff', width: 2, alpha: 0.8 });
+      iconG.stroke({ color: this.color('#ffffff'), width: 2, alpha: 0.8 });
 
       // Draw icon if specified
       if (config.icon) {
@@ -207,7 +207,7 @@ export class PixelWindow extends BaseEffect {
       iconG.fill({ color: iconColor, alpha: 0.3 });
       
       // Color dots
-      const colors = ['#ffb3d9', '#b3e5fc', '#c8f7dc', '#fff9b3'];
+      const colors = [this.color('#ffb3d9'), this.color('#b3e5fc'), this.color('#c8f7dc'), this.color('#fff9b3')];
       const dotSize = size / 6;
       for (let i = 0; i < 4; i++) {
         const angle = (i / 4) * Math.PI * 2;

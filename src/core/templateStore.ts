@@ -6,13 +6,38 @@ import type { TemplateConfig } from './types';
 const STORAGE_KEY = 'pv-tool-custom-templates';
 const SHARE_KEY = 'PV2026';
 
+/** Validate imported structure without stripping unknown effect configuration fields. */
+export function validateTemplate(value: unknown): asserts value is TemplateConfig {
+  const template = value as TemplateConfig;
+  const palette = (p: any) => p && ['background', 'primary', 'secondary', 'accent', 'text'].every(key => typeof p[key] === 'string');
+  const effects = (entries: any) => Array.isArray(entries) && entries.every(e => e && typeof e.type === 'string'
+    && ['background', 'decoration', 'media', 'text', 'overlay'].includes(e.layer)
+    && e.config && typeof e.config === 'object' && !Array.isArray(e.config)
+    && (e.enabled === undefined || typeof e.enabled === 'boolean')
+    && (e.id === undefined || typeof e.id === 'string')
+    && (e.palette === undefined || (e.palette && Object.values(e.palette).every(c => typeof c === 'string'))));
+  const postfx = (p: any) => p && typeof p === 'object' && !Array.isArray(p)
+    && ['shake', 'zoom', 'tilt', 'glitch', 'hueShift'].every(key => p[key] === undefined || (typeof p[key] === 'number' && Number.isFinite(p[key])));
+  if (!template || typeof template.name !== 'string' || !template.name || !palette(template.palette) || !effects(template.effects)
+    || (template.postfx !== undefined && !postfx(template.postfx))
+    || (template.lrc !== undefined && typeof template.lrc !== 'string')
+    || (template.shots !== undefined && (!Array.isArray(template.shots) || !template.shots.every(s => s === null || (s && s.rect
+      && ['x', 'y', 'w', 'h'].every(key => typeof (s.rect as any)[key] === 'number' && Number.isFinite((s.rect as any)[key]))
+      && s.rect.w > 0 && s.rect.h > 0))))
+    || (template.shotStyles !== undefined && (!Array.isArray(template.shotStyles) || !template.shotStyles.every(s => s === null || (s && typeof s === 'object'
+      && (s.effects === undefined || (palette(s.effects.palette) && effects(s.effects.effects)))
+      && (s.postfx === undefined || postfx(s.postfx))))))) throw new Error('Invalid template data');
+}
+
 // ── LocalStorage persistence ──
 
 export function loadCustomTemplates(): TemplateConfig[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as TemplateConfig[];
+    const templates: unknown = JSON.parse(raw);
+    if (!Array.isArray(templates)) return [];
+    return templates.filter(template => { try { validateTemplate(template); return true; } catch { return false; } });
   } catch {
     return [];
   }
@@ -122,8 +147,6 @@ export async function decodeShareCode(code: string): Promise<TemplateConfig> {
   const raw = await decompressBytes(compressed);
   const json = new TextDecoder().decode(raw);
   const template = JSON.parse(json) as TemplateConfig;
-  if (!template.name || !template.palette || !Array.isArray(template.effects)) {
-    throw new Error('Invalid template data');
-  }
+  validateTemplate(template);
   return template;
 }

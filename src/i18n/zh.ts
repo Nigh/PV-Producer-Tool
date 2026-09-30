@@ -312,6 +312,7 @@ export const zh = {
   "shot_label": "分镜",
   "shot_list": "分镜列表",
   "framing": "取景",
+  "shared_framing": "共用同一取景镜头",
   "loop_on_select": "选镜时循环预览",
   "style_saved": "配置已保存",
   "style_explicit": "本镜独立设置",

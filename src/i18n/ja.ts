@@ -316,6 +316,7 @@ export const ja: Record<LocaleKey, string> = {
   "shot_label": "ショット",
   "shot_list": "ショット一覧",
   "framing": "構図",
+  "shared_framing": "同じカメラショットを共有",
   "loop_on_select": "選択時にループ再生",
   "style_saved": "設定を保存しました",
   "style_explicit": "このショットの設定",

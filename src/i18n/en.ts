@@ -315,6 +315,7 @@ export const en: Record<LocaleKey, string> = {
   "shot_label": "Shot",
   "shot_list": "Shot list",
   "framing": "Framing",
+  "shared_framing": "Shared camera shot",
   "loop_on_select": "Loop selected shot",
   "style_saved": "Configuration saved",
   "style_explicit": "Defined on this shot",

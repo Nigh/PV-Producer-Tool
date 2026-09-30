@@ -2,6 +2,7 @@
      Licensed under Non-Commercial License. See LICENSE for terms. -->
 <script lang="ts">
   import { t } from '../../i18n';
+  import { shotRunRange } from '../../core/shotMath';
   import { ui, engine, focusLine, clearLineFocus, setSingleLineEdit, exitLineLoop } from '../store.svelte';
   import ShotsSection from './ShotsSection.svelte';
   import EffectsSection from './EffectsSection.svelte';
@@ -9,6 +10,19 @@
   let tab = $state<'shots' | 'effects' | 'postfx'>('shots');
   let listOpen = $state(false);
   const lines = $derived.by(() => { void ui.textRevision; return engine.hasLyricTimeline ? engine.segmentTexts : []; });
+  const framingGroups = $derived.by(() => {
+    const groups: ({ start: number; end: number } | undefined)[] = [];
+    let first = true;
+    ui.shots.forEach((shot, slot) => {
+      if (!shot || slot >= lines.length) return;
+      // The camera also uses the first defined shot for preceding empty slots.
+      const start = first ? 0 : slot;
+      first = false;
+      const end = Math.min(shotRunRange(ui.shots, slot).end, lines.length - 1);
+      if (end > start) for (let i = start; i <= end; i++) groups[i] = { start, end };
+    });
+    return groups;
+  });
   function clock(time: number) { return `${Math.floor(time / 60)}:${(time % 60).toFixed(1).padStart(4, '0')}`; }
   function pick(index: number) { focusLine(index); listOpen = false; }
   const title = $derived(ui.focusedLine === null ? t('project_default') : `${t('shot_label')} ${ui.focusedLine + 1} · ${lines[ui.focusedLine] ?? ''}`);
@@ -20,11 +34,13 @@
     <button class="shot-default" class:selected={ui.focusedLine === null} onclick={clearLineFocus}>{t('project_default')}</button>
     <ul>
       {#each lines as line, i (i)}
-        <li>
+        {@const group = framingGroups[i]}
+        <li class:framing-group={!!group} class:framing-group-start={group?.start === i} class:framing-group-end={group?.end === i}>
           <button class="workbench-line" class:selected={ui.focusedLine === i}
             class:playing={ui.playbackTime >= engine.segmentStartTime(i) && ui.playbackTime < engine.segmentEndTime(i)}
             aria-pressed={ui.focusedLine === i} onclick={() => pick(i)}>
-            <span class="line-number">{String(i + 1).padStart(2, '0')}</span>
+            <span class="line-number" title={group ? `${t('shared_framing')} · ${group.start + 1}–${group.end + 1}` : undefined}>{String(i + 1).padStart(2, '0')}</span>
+            {#if group}<span class="sr-only">{t('shared_framing')} · {group.start + 1}–{group.end + 1}</span>{/if}
             <span class="line-description"><strong>{line || '—'}</strong><small>{clock(engine.segmentStartTime(i))}–{clock(engine.segmentEndTime(i))}</small>
               <span class="line-markers">
                 <span class:defined={!!ui.shots[i]}>{t('framing')}</span>

@@ -71,6 +71,7 @@ export class ShotCamera {
   }
 
   setImage(img: HTMLImageElement | null): void {
+    if (img === this.img) return;
     this.img = img;
     this.clearCache();
     this.curSlot = -1;

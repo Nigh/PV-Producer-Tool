@@ -20,7 +20,7 @@ export class MotionBrackets extends BaseEffect {
   protected setup(): void {
     this.g = new PIXI.Graphics();
     this.container.addChild(this.g);
-    this.label = new PIXI.Text({ text: '', style: { fontSize: 11, fill: '#00ffcc', fontFamily: 'monospace' } });
+    this.label = new PIXI.Text({ text: '', style: { fontSize: 11, fill: this.color('#00ffcc'), fontFamily: 'monospace' } });
     this.container.addChild(this.label);
   }
 
@@ -148,7 +148,7 @@ export class MotionBrackets extends BaseEffect {
 
     const noMatchLabel = new PIXI.Text({
       text: 'NO MATCH',
-      style: { fontFamily: 'monospace', fontSize: 11, fill: '#000000', fontWeight: 'bold' },
+      style: { fontFamily: 'monospace', fontSize: 11, fill: this.color('#000000'), fontWeight: 'bold' },
     });
     noMatchLabel.x = t.x + 5;
     noMatchLabel.y = t.y - headerH - 2;

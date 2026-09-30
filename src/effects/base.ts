@@ -2,6 +2,7 @@
 // Licensed under Non-Commercial License. See LICENSE for terms.
 
 import * as PIXI from 'pixi.js';
+import { resolveColor } from '../core/types';
 import type { ColorPalette, UpdateContext } from '../core/types';
 
 export abstract class BaseEffect {
@@ -23,10 +24,22 @@ export abstract class BaseEffect {
     this._ownContainer = new PIXI.Container();
     parentLayer.addChild(this._ownContainer);
     this.container = this._ownContainer;
-    this.config = config;
     this.palette = palette;
+    const resolve = (value: any): any => {
+      if (typeof value === 'string' && /^\$(background|primary|secondary|accent|text|line)$/.test(value)) return resolveColor(value, palette);
+      if (Array.isArray(value)) return value.map(resolve);
+      if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, resolve(item)]));
+      return value;
+    };
+    this.config = resolve(config);
     this.renderer = renderer;
     this.setup();
+  }
+
+  get effectivePalette(): ColorPalette { return this.palette; }
+
+  protected color(value: string): string {
+    return resolveColor(this.config.colorOverrides?.[value] ?? value, this.palette);
   }
 
   protected abstract setup(): void;

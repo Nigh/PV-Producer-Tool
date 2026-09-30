@@ -47,7 +47,7 @@ export class FallingText extends BaseEffect {
         fontSize: size,
         fill: color,
         fontWeight: 'bold',
-        stroke: { color: '#000000', width: Math.max(2, size * 0.06) },
+        stroke: { color: this.color('#000000'), width: Math.max(2, size * 0.06) },
         dropShadow: {
           color: color,
           blur: size * 0.3,

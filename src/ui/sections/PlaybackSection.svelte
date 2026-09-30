@@ -1,6 +1,7 @@
 <!-- PV Tool — Copyright (c) 2026 DanteAlighieri13210914
      Licensed under Non-Commercial License. See LICENSE for terms. -->
 <script lang="ts">
+  import Slider from '../Slider.svelte';
   import { t } from '../../i18n';
   import { ui, engine, applyTextInput } from '../store.svelte';
 
@@ -114,3 +115,10 @@
     <input type="file" accept="image/*,video/mp4,video/webm,video/mov" hidden bind:this={mediaInput} onchange={onMediaChange} />
   </div>
 </div>
+
+{#if ui.mediaLoaded}
+  <div class="settings-block-heading"><h2>{t('media_position')}</h2><button class="btn btn-xs" onclick={() => { ui.mediaX = 0; ui.mediaY = 0; ui.mediaScale = 1; engine.setMediaOffset(0, 0); engine.setMediaScale(1); }}>{t('reset_media')}</button></div>
+  <Slider label={t('offset_x')} display={String(ui.mediaX)} min={-500} max={500} step={5} bind:value={ui.mediaX} defaultValue={0} oninput={() => engine.setMediaOffset(ui.mediaX, ui.mediaY)} />
+  <Slider label={t('offset_y')} display={String(ui.mediaY)} min={-500} max={500} step={5} bind:value={ui.mediaY} defaultValue={0} oninput={() => engine.setMediaOffset(ui.mediaX, ui.mediaY)} />
+  <Slider label={t('scale')} display={ui.mediaScale.toFixed(2)} min={0.5} max={3} step={0.05} bind:value={ui.mediaScale} defaultValue={1} oninput={() => engine.setMediaScale(ui.mediaScale)} />
+{/if}

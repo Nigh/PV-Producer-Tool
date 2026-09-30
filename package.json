@@ -8,7 +8,9 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "check:shots": "node --experimental-strip-types tests/shotMath.check.ts",
     "build": "svelte-check --tsconfig ./tsconfig.json && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:styles": "node --experimental-strip-types tests/shotStyles.check.ts",
+    "update:effect-parameters": "node scripts/extract-effect-parameters.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^6.2.4",

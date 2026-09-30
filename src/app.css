@@ -1049,11 +1049,17 @@ body.pv-panels-hidden .pv-footer {
 .workbench { display: grid; grid-template-columns: 180px minmax(0, 1fr); flex: 1; min-height: 0; gap: 16px; }
 .workbench-list { display: flex; flex-direction: column; min-height: 0; gap: 10px; padding-right: 12px; border-right: 1px solid var(--pv-line); }
 .workbench-list ul { overflow-y: auto; flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; }
+.workbench-list li { display: flow-root; }
 .shot-default, .workbench-line { width: 100%; padding: 10px 8px; text-align: left; border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
 .shot-default:hover, .workbench-line:hover { background: color-mix(in oklab, var(--color-base-content) 7%, transparent); }
 .shot-default.selected, .workbench-line.selected { background: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100)); border-color: var(--color-primary); }
 .workbench-line { display: flex; align-items: flex-start; gap: 8px; margin: 2px 0; }
 .line-number { flex: none; font-variant-numeric: tabular-nums; font-size: 0.8rem; }
+.framing-group { position: relative; }
+.framing-group::before { content: ''; position: absolute; left: 15px; top: 0; bottom: 0; width: 2px; border-radius: 1px; background: color-mix(in oklab, var(--color-primary) 70%, var(--color-base-content)); pointer-events: none; z-index: 1; }
+.framing-group-start::before { top: 22px; }
+.framing-group-end::before { bottom: calc(100% - 22px); }
+.framing-group .line-number { position: relative; z-index: 2; width: 2ch; text-align: center; line-height: 20px; border-radius: 3px; background: var(--color-base-100); }
 .workbench-line.playing .line-number { color: var(--color-primary); text-decoration: underline; text-underline-offset: 4px; }
 .line-description { display: grid; min-width: 0; gap: 4px; }
 .line-description strong { font-size: 0.8rem; font-weight: 600; overflow-wrap: anywhere; }

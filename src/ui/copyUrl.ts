@@ -11,7 +11,7 @@ import { ui, getCurrentTemplateSnapshot } from './store.svelte';
  *
  * 模板的两种表达方式：
  * - 内置模板：`t=<index>`，链接短且稳定。
- * - 用户/AI/临时分享模板：必须把完整 TemplateConfig 编码进 `code=`，
+ * - 用户/临时分享模板：必须把完整 TemplateConfig 编码进 `code=`，
  *   因为接收方机器没有发送方 localStorage 里的 `user-*` 模板。
  */
 export function openCopyUrlModal(): void {
@@ -55,8 +55,9 @@ export function openCopyUrlModal(): void {
           const code = await encodeShareCode(config);
           params.set('code', code);
         } catch (err) {
-          console.warn('[PV] Encode share code failed, fallback to t=custom', err);
-          params.set('t', 'custom');
+          console.warn('[PV] Encode share code failed', err);
+          showToast(t('code_invalid'));
+          return;
         }
       } else {
         params.set('t', ui.selected);

@@ -4,7 +4,7 @@
 // 录制导出：普通模式走 MediaRecorder（mp4/webm），透明通道模式抓 PNG 序列打包 zip。
 
 import { t } from '../i18n';
-import { engine, ui } from './store.svelte';
+import { engine, ui, flushProject } from './store.svelte';
 
 export const rec = $state({
   recording: false,
@@ -106,6 +106,7 @@ export const recLabel = () =>
   rec.packing ? t('packing') : rec.recording ? t('stop') : t('rec');
 
 export function toggleRecording(): void {
+  flushProject();
   const useAlpha = engine.alphaMode;
   const slug = getTemplateSlug();
 

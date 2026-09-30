@@ -67,7 +67,7 @@ export class HudInfoPanel extends BaseEffect {
 
     // Semi-transparent dark background
     g.rect(panelX, panelY, panelW, panelH);
-    g.fill({ color: '#000000', alpha: 0.4 });
+    g.fill({ color: this.color('#000000'), alpha: 0.4 });
 
     // Accent bar at top (5px)
     g.rect(panelX, panelY, panelW, 5);

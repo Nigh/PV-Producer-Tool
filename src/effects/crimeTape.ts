@@ -121,9 +121,9 @@ export class CrimeTape extends BaseEffect {
 
     // 顶部和底部细边（深色加深感）
     g.rect(-overrun, -hw, width + overrun * 2, strip.tapeWidth * 0.06)
-      .fill({ color: 0x000000, alpha: 0.25 });
+      .fill({ color: Number.parseInt(this.color('#000000').slice(1), 16), alpha: 0.25 });
     g.rect(-overrun, hw - strip.tapeWidth * 0.06, width + overrun * 2, strip.tapeWidth * 0.06)
-      .fill({ color: 0x000000, alpha: 0.25 });
+      .fill({ color: Number.parseInt(this.color('#000000').slice(1), 16), alpha: 0.25 });
   }
 
   update(ctx: UpdateContext): void {

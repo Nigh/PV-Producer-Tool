@@ -4,7 +4,7 @@
 // UI 状态层：Svelte 5 runes 包装 PVEngine。
 // 模板状态的几个关键区分（沿袭自旧 main.ts）：
 // 1. 内置模板：URL 参数 `t=` 指向模板索引即可。
-// 2. 用户/AI 模板：可能包含 AI 生成的精细 effect.config，分享时必须序列化完整模板。
+// 2. 用户模板：可能包含精细 effect.config，分享时必须序列化完整模板。
 // 3. URL 分享模板：通过 `code=` 临时打开，不写入 localStorage，避免刷新/OBS 嵌入制造重复模板。
 // 4. Custom 编辑态：基于当前模板编辑，保留已有 effect 参数；仅新增效果回退到 catalog 默认值。
 
@@ -20,7 +20,8 @@ import {
   encodeShareCode,
   decodeShareCode,
 } from '../core/templateStore';
-import { generateConfigFromAI } from '../core/aiService';
+import { cloneConfig, effectGroup, normalizePostFx, normalizeShotStyles, resolveShotStyle } from '../core/shotStyles';
+import type { EffectEntry, EffectGroup, PostFxConfig, ShotStyle } from '../core/types';
 import { testNowPlayingConnection } from '../core/nowPlayingProvider';
 import { showToast } from '../core/uiHelpers';
 import type { AspectRatio } from '../core/shotAspect';
@@ -57,7 +58,6 @@ export const ui = $state({
   selected: '0',
   customTemplates: loadCustomTemplates() as TemplateConfig[],
   sharedTemplate: null as TemplateConfig | null,
-  checkedEffects: effectCatalog.map(() => false),
 
   // 运行参数（与引擎 setter 双向同步）
   speed: 2,
@@ -69,11 +69,6 @@ export const ui = $state({
   aspectRatio: loadAspect() as AspectRatio,
   fps: 0,
   fpsActual: 0,
-  shake: 0,
-  zoom: 0,
-  tilt: 0,
-  glitch: 0,
-  hue: 0,
 
   // 媒体
   mediaName: '',
@@ -88,6 +83,7 @@ export const ui = $state({
   audioPaused: false,
   lrcName: '',
   text: DEFAULT_TEXT,
+  appliedText: DEFAULT_TEXT,
 
   // 播放时间轴
   playbackTime: 0,
@@ -107,10 +103,11 @@ export const ui = $state({
   fontFamily: '',
   alphaMode: false,
   npListening: false,
-  aiLoading: false,
+  project: cloneConfig(templates[0]) as TemplateConfig,
+  styleRevision: 0,
+  loopLine: null as number | null,
+  textRevision: 0,
 });
-
-export const isCustomMode = () => ui.selected === 'custom';
 
 /** JSON 深拷贝：TemplateConfig 目前只含纯 JSON 数据。 */
 function cloneJson<T>(value: T): T {
@@ -122,29 +119,98 @@ export function cloneTemplateConfig(template: TemplateConfig): TemplateConfig {
 }
 
 /**
- * 以模板为基底、用引擎当前运行态（bpm/速度/透明度/postfx）覆盖后的快照。
- * 保存/导出/复制 URL 时用户期望拿到的是屏幕上正在看的效果。
+ * 完整项目快照；全片默认与逐镜配置不会随当前播放镜头改变。
  */
-export function buildRuntimeTemplateSnapshot(base: TemplateConfig, name = base.name): TemplateConfig {
-  const snapshot = cloneTemplateConfig(base);
+export function buildRuntimeTemplateSnapshot(_base: TemplateConfig, name = ui.project.name): TemplateConfig {
+  const snapshot = cloneConfig($state.snapshot(ui.project));
   snapshot.name = name;
-  snapshot.bpm = engine.beat.bpm;
-  snapshot.animationSpeed = engine.animationSpeed;
-  snapshot.bgOpacity = engine.effectOpacity;
-  snapshot.postfx = {
-    shake: engine.shake,
-    zoom: engine.zoom,
-    tilt: engine.tilt,
-    glitch: engine.glitch,
-    hueShift: engine.hueShift,
-  };
-  // 分镜属于运行态：保存/分享时带上当前编辑的分镜
-  if (engine.shots.some((s) => !!s)) {
-    snapshot.shots = cloneJson(engine.shots);
+  snapshot.bpm = ui.bpm;
+  snapshot.animationSpeed = ui.speed;
+  snapshot.motionIntensity = ui.motion;
+  snapshot.bgOpacity = ui.opacity;
+  snapshot.shots = cloneConfig($state.snapshot(ui.shots));
+  snapshot.lrc = ui.appliedText;
+  return normalizeShotStyles(snapshot, configFor);
+}
+
+/** Editor state is authoritative; playback never writes back into it. */
+export function editorStyle() {
+  return resolveShotStyle(ui.project, ui.focusedLine ?? -1, engine.lyricLineCount);
+}
+
+let styleTimer: ReturnType<typeof setTimeout>;
+function publishProject(immediate = false) {
+  ui.styleRevision++;
+  clearTimeout(styleTimer);
+  const apply = () => engine.setProjectTemplate(buildRuntimeTemplateSnapshot(ui.project));
+  if (immediate) apply(); else styleTimer = setTimeout(apply, 120);
+}
+
+export function flushProject() { publishProject(true); }
+
+export function editStyle<K extends keyof ShotStyle>(key: K, value: NonNullable<ShotStyle[K]>) {
+  const project = cloneConfig($state.snapshot(ui.project));
+  if (ui.focusedLine === null) {
+    if (key === 'effects') {
+      const group = value as EffectGroup;
+      project.palette = group.palette; project.effects = group.effects; project.features = group.features;
+    }
+    else project.postfx = value as PostFxConfig;
   } else {
-    delete snapshot.shots;
+    const styles = project.shotStyles ?? [];
+    while (styles.length <= ui.focusedLine) styles.push(null);
+    styles[ui.focusedLine] = { ...styles[ui.focusedLine], [key]: cloneConfig(value) };
+    project.shotStyles = styles;
   }
-  return snapshot;
+  ui.project = project;
+  ui.selected = 'custom';
+  publishProject();
+}
+
+export function restoreStyle(key: keyof ShotStyle) {
+  if (ui.focusedLine === null) return;
+  const project = cloneConfig($state.snapshot(ui.project));
+  const slot = project.shotStyles?.[ui.focusedLine];
+  if (slot) delete slot[key];
+  ui.project = project;
+  publishProject();
+}
+
+export function editEffects(change: (group: EffectGroup) => void) {
+  const group = cloneConfig($state.snapshot(editorStyle().effects.value));
+  group.effects.forEach(e => { e.id ??= crypto.randomUUID(); });
+  change(group);
+  editStyle('effects', group);
+}
+
+export function addEffect(index: number): string {
+  const preset = effectCatalog[index];
+  const id = crypto.randomUUID();
+  editEffects(group => group.effects.push({ id, type: preset.type, layer: preset.layer, config: cloneConfig(preset.config) }));
+  return id;
+}
+
+export function editEffect(index: number, change: (entry: EffectEntry) => void) {
+  editEffects(group => { if (group.effects[index]) change(group.effects[index]); });
+}
+
+export function editPostFx(key: keyof PostFxConfig, value: number) {
+  if (!Number.isFinite(value)) return;
+  editStyle('postfx', { ...editorStyle().postfx.value, [key]: value });
+}
+
+export function applyStyleTemplate(value: string, includePostFx = false) {
+  const template = configFor(value);
+  if (!template) return;
+  editStyle('effects', cloneConfig(effectGroup(template)));
+  if (includePostFx) editStyle('postfx', normalizePostFx(template.postfx));
+}
+
+export function saveEffectGroup(name: string) {
+  const group = cloneConfig($state.snapshot(editorStyle().effects.value));
+  ui.customTemplates.push({ name, ...group });
+  saveCustomTemplates($state.snapshot(ui.customTemplates));
+  showToast(t('style_saved'));
 }
 
 /** 将分镜数组补齐/截到指定行数（空槽填 null，与歌词行索引对齐）。 */
@@ -157,6 +223,7 @@ export function padShots(shots: (Shot | null)[], len: number): (Shot | null)[] {
 /** 更新分镜列表（编辑器 → 引擎）。 */
 export function setShots(shots: (Shot | null)[]): void {
   ui.shots = shots;
+  ui.project.shots = cloneConfig($state.snapshot(shots));
   engine.setShots(cloneJson($state.snapshot(shots)) as (Shot | null)[]);
 }
 
@@ -164,12 +231,13 @@ export function setShots(shots: (Shot | null)[]): void {
 export function focusLine(index: number): void {
   ui.focusedLine = index;
   if (ui.singleLineEdit) {
+    ui.loopLine = index;
     engine.loopSegment = index;
     const start = engine.segmentStartTime(index);
     const end = engine.segmentEndTime(index);
     engine.seek(Math.max(0, start + Math.max(0, end - start) / 2));
   } else {
-    engine.loopSegment = null;
+    exitLineLoop();
     engine.seek(engine.segmentStartTime(index));
   }
 }
@@ -177,6 +245,11 @@ export function focusLine(index: number): void {
 /** 取消歌词聚焦（退出句内循环）。 */
 export function clearLineFocus(): void {
   ui.focusedLine = null;
+  exitLineLoop();
+}
+
+export function exitLineLoop() {
+  ui.loopLine = null;
   engine.loopSegment = null;
 }
 
@@ -186,7 +259,7 @@ export function setSingleLineEdit(on: boolean): void {
   if (on && ui.focusedLine !== null) {
     focusLine(ui.focusedLine);
   } else {
-    engine.loopSegment = null;
+    exitLineLoop();
   }
 }
 
@@ -232,85 +305,8 @@ export function fullFrameShotRect(): ShotRect {
   return maxCenteredRect(shotNormAspect(asp, img.naturalWidth, img.naturalHeight));
 }
 
-/**
- * Custom 面板勾选项与模板 effects 的稳定匹配 key。
- * organicBlob 在 catalog 里有 blob/wave/cloud 多个同 type 变体，需把 shape 纳入。
- */
-export function effectSelectionKey(
-  entry: Pick<TemplateConfig['effects'][number], 'type' | 'config'>,
-): string {
-  if (entry.type === 'organicBlob') {
-    return `${entry.type}:${entry.config?.shape ?? 'blob'}`;
-  }
-  return entry.type;
-}
-
-/**
- * 根据勾选状态生成自定义模板。勾选项命中当前模板已有 effect 时复用其完整
- * config（保留 AI/分享模板的精细参数），只有新增勾选才用 catalog 默认值。
- */
 export function buildCustomTemplate(): TemplateConfig {
-  const curTpl = engine.currentTemplateConfig;
-  const existingEffects = new Map<string, TemplateConfig['effects']>();
-  curTpl?.effects.forEach((effect) => {
-    const key = effectSelectionKey(effect);
-    const pool = existingEffects.get(key) ?? [];
-    pool.push(cloneJson(effect));
-    existingEffects.set(key, pool);
-  });
-
-  const effects: TemplateConfig['effects'] = [];
-  ui.checkedEffects.forEach((checked, idx) => {
-    if (!checked) return;
-    const preset = effectCatalog[idx];
-    const existing = existingEffects.get(effectSelectionKey(preset))?.shift();
-    effects.push(existing ?? { type: preset.type, layer: preset.layer, config: { ...preset.config } });
-  });
-
-  const template = curTpl
-    ? buildRuntimeTemplateSnapshot(curTpl, 'Custom')
-    : {
-      name: 'Custom',
-      palette: {
-        background: '#ffffff',
-        primary: '#000000',
-        secondary: '#888888',
-        accent: '#ff3366',
-        text: '#000000',
-      },
-      effects,
-      bpm: engine.beat.bpm,
-      animationSpeed: engine.animationSpeed,
-      bgOpacity: engine.effectOpacity,
-      postfx: {
-        shake: engine.shake,
-        zoom: engine.zoom,
-        tilt: engine.tilt,
-        glitch: engine.glitch,
-        hueShift: engine.hueShift,
-      },
-    };
-  template.effects = effects;
-  return template;
-}
-
-/** 引擎运行态 → UI 滑块。 */
-export function syncFromEngine(): void {
-  ui.speed = engine.animationSpeed;
-  ui.opacity = engine.effectOpacity;
-  ui.bpm = engine.beat.bpm;
-  ui.shake = engine.shake;
-  ui.zoom = engine.zoom;
-  ui.tilt = engine.tilt;
-  ui.glitch = engine.glitch;
-  ui.hue = engine.hueShift;
-  ui.shots = engine.shots;
-}
-
-/** 模板配置 → Custom 勾选状态。 */
-export function syncCheckedEffects(config: TemplateConfig): void {
-  const configKeys = new Set(config.effects.map(effectSelectionKey));
-  ui.checkedEffects = effectCatalog.map((preset) => configKeys.has(effectSelectionKey(preset)));
+  return buildRuntimeTemplateSnapshot(ui.project);
 }
 
 function configFor(val: string): TemplateConfig | null {
@@ -326,29 +322,20 @@ const syncChannel = new BroadcastChannel('pv-tool-sync');
 
 /** 模板切换入口（模板管理、URL 参数、跨窗口同步共用）。 */
 export function selectTemplate(val: string, broadcast = true): void {
-  if (val === 'custom') {
-    ui.selected = 'custom';
-    engine.loadTemplate(buildCustomTemplate());
-    engine.resetShotTemplateTracking('custom');
-  } else {
-    const config = configFor(val);
-    if (!config) {
-      ui.selected = '0';
-      engine.loadTemplate(templates[0]);
-      engine.resetShotTemplateTracking('0');
-      syncCheckedEffects(templates[0]);
-      syncFromEngine();
-      return;
-    }
-    ui.selected = val;
-    engine.loadTemplate(config);
-    engine.resetShotTemplateTracking(val);
-    syncCheckedEffects(config);
-    syncFromEngine();
-  }
-  if (broadcast && val !== 'custom') {
-    syncChannel.postMessage({ type: 'template', value: val });
-  }
+  const config = val === 'custom' ? buildCustomTemplate() : configFor(val);
+  if (!config) return;
+  ui.project = normalizeShotStyles(config, configFor);
+  ui.selected = val;
+  ui.shots = cloneConfig(ui.project.shots ?? []);
+  ui.speed = config.animationSpeed ?? 2;
+  ui.motion = config.motionIntensity ?? 1;
+  ui.opacity = config.bgOpacity ?? 1;
+  ui.bpm = config.bpm ?? 120;
+  clearLineFocus();
+  engine.loadTemplate(ui.project);
+  if (config.lrc !== undefined) applyTextInput(config.lrc);
+  flushProject();
+  if (broadcast && val !== 'custom') syncChannel.postMessage({ type: 'template', value: val });
 }
 
 syncChannel.addEventListener('message', (ev) => {
@@ -357,39 +344,9 @@ syncChannel.addEventListener('message', (ev) => {
   if (configFor(value)) selectTemplate(value, false);
 });
 
-let customRebuildTimer: ReturnType<typeof setTimeout>;
-/** Custom 勾选变化后防抖重建模板。 */
-export function scheduleCustomRebuild(): void {
-  if (!isCustomMode()) return;
-  clearTimeout(customRebuildTimer);
-  customRebuildTimer = setTimeout(() => {
-    try {
-      engine.loadTemplate(buildCustomTemplate());
-    } catch (err) {
-      console.warn('[PV] Custom template rebuild failed:', err);
-    }
-  }, 300);
-}
-
-/** 提供给复制 URL 的当前模板快照。 */
 export function getCurrentTemplateSnapshot(): { isCustom: boolean; config: TemplateConfig } {
-  const val = ui.selected;
-  if (val === 'custom') {
-    return { isCustom: true, config: buildCustomTemplate() };
-  }
-  if (val === 'shared' && ui.sharedTemplate) {
-    return { isCustom: true, config: buildRuntimeTemplateSnapshot(ui.sharedTemplate) };
-  }
-  if (val.startsWith('user-')) {
-    const idx = parseInt(val.split('-')[1]);
-    const config = ui.customTemplates[idx] ?? engine.currentTemplateConfig ?? templates[0];
-    return { isCustom: true, config: buildRuntimeTemplateSnapshot(config) };
-  }
-  const idx = parseInt(val);
-  const config = !isNaN(idx) && idx >= 0 && idx < templates.length
-    ? templates[idx]
-    : engine.currentTemplateConfig ?? templates[0];
-  return { isCustom: false, config: buildRuntimeTemplateSnapshot(config) };
+  flushProject();
+  return { isCustom: true, config: buildRuntimeTemplateSnapshot(ui.project) };
 }
 
 /** 保存 Custom 为用户模板。 */
@@ -397,30 +354,18 @@ export function saveCustomAs(name: string): void {
   const tpl = { ...buildCustomTemplate(), name };
   ui.customTemplates.push(tpl);
   saveCustomTemplates(ui.customTemplates);
-  selectTemplate(`user-${ui.customTemplates.length - 1}`);
-}
-
-export function deleteSelectedTemplate(): void {
-  const val = ui.selected;
-  if (!val.startsWith('user-')) return;
-  ui.customTemplates.splice(parseInt(val.split('-')[1]), 1);
-  saveCustomTemplates(ui.customTemplates);
-  selectTemplate('0');
+  showToast(t('style_saved'));
 }
 
 export async function exportShareCode(): Promise<void> {
-  const val = ui.selected;
-  if (!val.startsWith('user-')) return;
-  const idx = parseInt(val.split('-')[1]);
-  // 导出运行态快照，避免调过速度/透明度/postfx 后导出的仍是初始值。
-  const code = await encodeShareCode(buildRuntimeTemplateSnapshot(ui.customTemplates[idx]));
+  const code = await encodeShareCode(buildRuntimeTemplateSnapshot(ui.project));
   try { await navigator.clipboard.writeText(code); } catch { /* noop */ }
   showToast(t('code_copied'));
 }
 
 /** 导入分享码；失败时抛出，由调用方展示错误。 */
 export async function importShareCode(code: string): Promise<void> {
-  const tpl = await decodeShareCode(code);
+  const tpl = normalizeShotStyles(await decodeShareCode(code), configFor);
   ui.customTemplates.push(tpl);
   saveCustomTemplates(ui.customTemplates);
   selectTemplate(`user-${ui.customTemplates.length - 1}`);
@@ -428,33 +373,43 @@ export async function importShareCode(code: string): Promise<void> {
 
 /** 文本输入应用：仅接受带时间戳的 LRC。 */
 export function applyTextInput(rawText: string): boolean {
+  if (!rawText.trim()) {
+    if ((ui.shots.some(Boolean) || ui.project.shotStyles?.some(Boolean)) && !window.confirm(t('trim_shots_confirm'))) {
+      ui.text = ui.appliedText;
+      return false;
+    }
+    ui.text = ui.appliedText = '';
+    ui.shots = [];
+    ui.project.shots = [];
+    ui.project.shotStyles = [];
+    clearLineFocus();
+    engine.setText('');
+    ui.textRevision++;
+    flushProject();
+    return true;
+  }
   const hasTimestamps = /\[\d{1,2}:\d{2}/.test(rawText);
   if (hasTimestamps) {
     const parsed = parseLrc(rawText);
     if (parsed.length > 0) {
+      const n = parsed.length;
+      if (ui.shots.slice(n).some(Boolean) || ui.project.shotStyles?.slice(n).some(Boolean)) {
+        if (!window.confirm(t('trim_shots_confirm'))) { ui.text = ui.appliedText; return false; }
+      }
+      ui.shots = padShots(ui.shots, n);
+      ui.project.shots = cloneConfig($state.snapshot(ui.shots));
+      ui.project.shotStyles = Array.from({ length: n }, (_, i) => ui.project.shotStyles?.[i] ?? null);
+      if (ui.focusedLine !== null && ui.focusedLine >= n) clearLineFocus();
+      ui.text = rawText;
+      ui.appliedText = rawText;
+      ui.textRevision++;
       engine.setLyricTimeline(parsed);
+      flushProject();
       return true;
     }
   }
   showToast(t('lrc_required'));
   return false;
-}
-
-/** AI 生成模板并保存为用户模板。 */
-export async function aiGenerate(prompt: string, apiKey: string, apiUrl: string, model: string): Promise<void> {
-  ui.aiLoading = true;
-  try {
-    const config = await generateConfigFromAI(prompt, apiKey, apiUrl, model);
-    ui.customTemplates.push(config);
-    saveCustomTemplates(ui.customTemplates);
-    selectTemplate(`user-${ui.customTemplates.length - 1}`);
-    showToast(t('ai_generate_success'));
-  } catch (err) {
-    console.error('[PV] AI generate config execution failed:', err);
-    showToast(t('ai_generate_error'));
-  } finally {
-    ui.aiLoading = false;
-  }
 }
 
 let npConnecting = false;
@@ -488,14 +443,7 @@ export async function toggleNowPlaying(on: boolean): Promise<boolean> {
 export async function initApp(container: HTMLElement): Promise<void> {
   await engine.init(container, ui.aspectRatio);
   engine.beat.beatOffset = ui.beatOffset;
-  // 逐句模板：引擎按分镜切换模板时经这里解析选择值并回写 UI 状态
-  engine.templateResolver = (sel) => configFor(sel);
-  engine.onShotTemplateApplied = (sel) => {
-    ui.selected = sel;
-    const config = configFor(sel);
-    if (config) syncCheckedEffects(config);
-    syncFromEngine();
-  };
+  for (const key of ['pv-tool-ai-api-key', 'pv-tool-ai-api-url', 'pv-tool-ai-api-model']) localStorage.removeItem(key);
   applyTextInput(DEFAULT_TEXT);
   engine.onFpsUpdate = (fps) => { ui.fpsActual = fps; };
 

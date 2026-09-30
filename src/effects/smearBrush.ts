@@ -65,7 +65,7 @@ export class SmearBrush extends BaseEffect {
     const count = this.config.count ?? 8;
     if (this.strokes.length === count) return;
 
-    const colors = this.config.colors ?? [
+    const colors = this.config.colors?.length ? this.config.colors : [
       this.palette.primary,
       this.palette.secondary,
       this.palette.accent,

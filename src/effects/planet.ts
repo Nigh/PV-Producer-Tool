@@ -80,7 +80,7 @@ export class Planet extends BaseEffect {
 
     // Core circle
     g.circle(px, py, coreR);
-    g.fill({ color: '#000000', alpha: 1 });
+    g.fill({ color: this.color('#000000'), alpha: 1 });
     g.circle(px, py, coreR);
     g.stroke({ color, width: 1.5, alpha: 0.8 });
 

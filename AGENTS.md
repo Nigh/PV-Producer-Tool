@@ -10,16 +10,16 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 - **UI**: Svelte 5 (runes) + Tailwind CSS v4 + daisyUI v5, themed by `@xianii/design-system` (imported in `src/app.css`).
 - **Build**: Vite 7 (`@sveltejs/vite-plugin-svelte` v6, `@tailwindcss/vite`) + TypeScript 5.9 (`strict`, `verbatimModuleSyntax`, `noEmit`). Type checking via `svelte-check` (covers .ts and .svelte).
 - **Commands**: `npm run dev` (Vite dev + HMR), `npm run check` (svelte-check), `npm run build` (`svelte-check && vite build`), `npm run preview`.
-- No test framework. `npm run build` is the CI-grade check; `npm run check:shots` runs the assert-based shot-math self-check (node, no framework); `tests/shotCamera.smoke.html` is a browser integration smoke for the shot camera (open via dev server).
+- No test framework. `npm run build` is the CI-grade check; `npm run check:shots` runs the assert-based shot-math self-check; `npm run check:styles` checks appearance inheritance, isolation, compatibility and share-code round trips (node, no framework); `tests/shotStyles.smoke.html` checks actual rendering and paused/seek behavior; `tests/shotCamera.smoke.html` is a browser integration smoke for the shot camera (open via dev server).
 - Vite `base` is `/pv-tool/` (override with `VITE_BASE` env var). Deployed to GitHub Pages via `.github/workflows/deploy.yml` on push to `main`. Working branch is `dev`.
 
 ## 3) Repo Layout
 
 - `src/main.ts` — slim entry: mounts the Svelte `App` (UI lives in `src/ui/`).
 - `src/ui/` — Svelte UI layer:
-  - `store.svelte.ts` — runes state (`ui`), the `PVEngine` instance, and all template-management actions (select/save/delete/share-code/AI-generate/URL-param init). The single source of truth for UI↔engine sync.
-  - `App.svelte` — left-sidebar navigation shell (nav rail + active section), engine mount, H-key hide-all, AI loader overlay, footer. Mobile: sidebar becomes an overlay drawer.
-  - `sections/` — one component per nav section (Settings first): Settings (aspect 16:9|9:16, BPM + beat offset 0–1, beat react, font/FPS/theme/NP-listen), Assets/素材 (timestamped LRC only, audio, 曲绘/illustration), Shots (per-lyric-line shot editor, two-column layout in a widened sidebar: lyric list left — selecting a line focuses it and loops playback within that line (exit via re-click / Esc / player-bar chip / any player-bar seek control), framing thumbnail right; aspect-locked framing, per-line template pick + speed/motion/opacity overrides, Ken Burns motion amount slider, canvas color, collapsed Template Manager at the bottom — Template is no longer a nav item), PostFx, Effects (grid; toggling while a preset is active auto-switches to Custom), Ai, Export. Player bar (seek/prev/play/next/clock + line-loop chip) sits directly under the preview frame (`PlayerBar.svelte`); the GitHub/contributors footer sits between preview and player bar.
+  - `store.svelte.ts` — runes state (`ui`), the `PVEngine` instance, and all template-management actions (project-default/checkpoint editing, save/share-code/URL-param init). The single source of truth for UI↔engine sync.
+  - `App.svelte` — left-sidebar navigation shell (nav rail + active section), engine mount, H-key hide-all and footer. Compact screens: preview above editor; shot list becomes a drawer.
+  - `sections/` — Assets, Workbench, Settings, Export. `Workbench.svelte` keeps the lyric/shot list and editor target across its Framing, Effects, and PostFx tabs. Effects are instances (duplicates allowed), with per-instance config/palette, enable, copy/delete and ordering within a layer; `PropertyEditor.svelte` handles complete parameter definitions and nested arrays/objects. Framing keeps camera geometry, motion and transitions only. Editing target (`focusedLine`) and playback loop (`loopLine`) are separate; seeking/exiting a loop never changes the editing target. Templates in Effects apply an effect group or a group plus postfx; saved projects include timestamped lyrics, shots and styles, but not media. Player bar sits below the preview.
   - `theme.svelte.ts` — xianii / xianii-light theme switch persisted in localStorage; aspect ratio and beat offset also persist there.
   - `recorder.svelte.ts` — MediaRecorder + PNG-sequence (alpha) export. `copyUrl.ts` — copy-URL modal.
   - `Slider.svelte` — labeled range control.
@@ -27,8 +27,8 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 - `src/core/` — engine and services (framework-free):
   - `engine.ts` — `PVEngine`: PixiJS app, layer stack, effect lifecycle, post-FX (shake/zoom/glitch/chromatic aberration), HiDPI with auto-downscale when many heavy effects are active.
   - `types.ts` — `TemplateConfig`, `ColorPalette`, `UpdateContext`, `resolveColor()`.
-  - `effectCatalog.ts` — UI-facing catalog of all effects (labels, default configs, categories).
-  - `aiService.ts` — AI template generation via OpenAI-compatible `/v1/chat/completions`; user supplies base URL + API key at runtime (never hardcode keys). `EFFECT_SKILLS` maps effect ids to Chinese semantic descriptions for the LLM.
+  - `effectCatalog.ts` — UI-facing catalog of all effects (labels, default configs, categories). `effectParameters.ts` supplements the actual source inventory in `effectParameterInventory.ts`; after changing configurable effect fields, run `npm run update:effect-parameters`. Runtime-dependent defaults remain unset until edited.
+  - `shotStyles.ts` — pure resolver for independent effect-group and postfx checkpoints (`TemplateConfig.shotStyles`), source/affected range, deep cloning and legacy `Shot.template` materialization. An empty effect list or all-zero postfx is an explicit checkpoint. Styles never establish camera boundaries.
   - `templateStore.ts` — custom templates in `localStorage` + share-code encode/decode (JSON+deflate — new optional `TemplateConfig` fields like `shots` pass through automatically, backward compatible).
   - `shotMath.ts` — pure, time-parametric shot-view math (cover framing, Ken Burns motion, in/out transitions); seek-safe by construction, covered by `tests/shotMath.check.ts`.
   - `shotAspect.ts` — canvas aspect ↔ normalized shot-rect helpers (locked framing for 16:9 / 9:16).
@@ -41,7 +41,7 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 
 ## 4) Conventions
 
-- New effect = new file in `src/effects/` extending `BaseEffect` + `register()` in `src/effects/index.ts` + entry in `effectCatalog.ts` (+ `EFFECT_SKILLS` in `aiService.ts` and i18n labels if user-facing).
+- New effect = new file in `src/effects/` extending `BaseEffect` + `register()` in `src/effects/index.ts` + entry in `effectCatalog.ts` (+ parameter inventory regeneration and i18n labels if user-facing).
 - Source files carry the license header comment (`PV Tool — Copyright (c) 2026 DanteAlighieri13210914`); keep it on new files.
 - **License is Non-Commercial** (relicensed from AGPL-3.0 on 2026/3/24, see `LICENSE` / `COMMERCIAL.md`). Do not vendor in code with incompatible license expectations.
 - UI copy is primarily Chinese; code comments are mixed Chinese/English — either is fine.
@@ -49,12 +49,12 @@ Browser-based kinetic typography / post-processing engine for PV (music video) s
 ## 5) Known Facts / Gotchas
 
 - Preview letterboxes a 16:9 or 9:16 `#pv-container`; PIXI renders at a **fixed design resolution** (1920×1080 or 1080×1920) and the canvas is CSS-scaled to fill the frame — window resize must not reflow effect layout. Aspect changes call `engine.setDesignAspect` (resize + scheduled template reload). Never destroy the scene graph inside a resize/render callback (Pixi v8 `TextureSource.alphaMode` crash); template reloads are deferred to the next ticker tick. Same deferral applies to per-shot template switches. Destroy paths clear `filters` before `destroy()`. Lyrics require timestamped LRC (no `/` text split).
-- Templates are per-shot effect sets: `Shot.template` selects the template for that lyric line (inherits forward like the framing rect); `Shot.animationSpeed/motionIntensity/bgOpacity` override globals for that line only. Engine switches templates at segment boundaries via `templateResolver` injected from the UI store.
+- `ui.project` is the source of truth for project defaults and `shotStyles`; the currently rendered engine template must never overwrite editor state or saved defaults. Effects and postfx each inherit forward independently until the next checkpoint. First edit clones the effective group. `Shot.template` is legacy-only, materialized to embedded effect groups on load/save; missing references report an error. `Shot.animationSpeed/motionIntensity/bgOpacity` remain line-local runtime overrides for compatibility. Engine resolves the current lyric clock before frame-boundary reloads, including paused edits and backward seeks. Instance palettes apply to setup and update; fixed detail colors use `config.colorOverrides`.
 - Shot transitions: multi-line inherited runs suppress per-line in/out; Ken Burns motion spans the whole run. Between different shots, `out: fade` is coerced to `cut` so the frame never dips to canvas color — crossfade is prevSprite × next `in: fade` only.
 - `src/core/` must stay framework-free (no Svelte imports); UI state belongs in `src/ui/store.svelte.ts`.
 - `tsconfig` has `noUnusedLocals`/`noUnusedParameters` — dead code fails the build.
 - Effects must clean up in `destroy()`; `BaseEffect.destroy()` handles the container tree, but external resources (video elements, intervals, canvases) are the effect's responsibility.
-- No environment secrets exist in the repo; the only key (AI API key) is user-provided in the browser.
+- No backend or AI generation remains. Old AI setting keys are removed on startup; previously generated user templates remain ordinary templates.
 
 ## 6) Rules For Future Agents (must follow)
 
